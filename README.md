@@ -1,13 +1,4 @@
 <div id="top"></div>
-<!--
-*** Thanks for checking out the Best-README-Template. If you have a suggestion
-*** that would make this better, please fork the repo and create a pull request
-*** or simply open an issue with the tag "enhancement".
-*** Don't forget to give the project a star!
-*** Thanks again! Now go create something AMAZING! :D
--->
-
-
 
 <!-- PROJECT SHIELDS -->
 <!--
@@ -40,14 +31,11 @@
   <p align="center">
     Machine learning pipeline for NLP projects
     <br />
-    <a href="https://github.com/mvmagni/magritte"><strong>Explore the docs »</strong></a>
     <br />
+    <a href="https://github.com/mvmagni/magritte/documents"><strong>Explore the docs</strong></a>
     <br />
-    <a href="https://github.com/mvmagni/magritte">View Demo</a>
-    ·
-    <a href="https://github.com/mvmagni/magritte/issues">Report Bug</a>
-    ·
-    <a href="https://github.com/mvmagni/magritte/issues">Request Feature</a>
+      <a href="https://github.com/mvmagni/magritte/issues"><strong>Report Bug/Request Feature</strong></a>
+    <br />
   </p>
 </div>
 
@@ -58,9 +46,6 @@
   <ol>
     <li>
       <a href="#about-the-project">About The Project</a>
-      <ul>
-        <li><a href="#built-with">Built With</a></li>
-      </ul>
     </li>
     <li>
       <a href="#getting-started">Getting Started</a>
@@ -74,7 +59,7 @@
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
+    <li><a href="#acknowledgments">Acknowledgments and Resources</a></li>
   </ol>
 </details>
 
@@ -96,26 +81,7 @@ Here's why:
 
 Of course, no one template will serve all projects since your needs may be different. So I'll be adding more in the near future. You may also suggest changes by forking this repo and creating a pull request or opening an issue. Thanks to all the people have contributed to expanding this template!
 
-Use the `BLANK_README.md` to get started.
-
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
-### Built With
-
-This section should list any major frameworks/libraries used to bootstrap your project. Leave any add-ons/plugins for the acknowledgements section. Here are a few examples.
-
-* [Next.js](https://nextjs.org/)
-* [React.js](https://reactjs.org/)
-* [Vue.js](https://vuejs.org/)
-* [Angular](https://angular.io/)
-* [Svelte](https://svelte.dev/)
-* [Laravel](https://laravel.com)
-* [Bootstrap](https://getbootstrap.com)
-* [JQuery](https://jquery.com)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 
 
 <!-- GETTING STARTED -->
@@ -210,20 +176,22 @@ Distributed under the GPLv3 License. See `LICENSE.md` for more information.
 
 
 <!-- CONTACT -->
+
 ## Contact
 
-Your Name - [@your_twitter](https://twitter.com/your_username) - email@example.com
+Twitter - [@Ghost_in_the_NN](https://twitter.com/Ghost_in_the_NN)
 
-Project Link: [https://github.com/your_username/repo_name](https://github.com/mvmagni/magritte)
+Project Link: [https://github.com/mvmagni/magritte](https://github.com/mvmagni/magritte)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
 
 
 <!-- ACKNOWLEDGMENTS -->
-## Acknowledgments
 
-Use this space to list resources you find helpful and would like to give credit to. I've included a few of my favorites to kick things off!
+## Acknowledgments and Resources
+
+Helpful resources and background information
 
 * [Choose an Open Source License](https://choosealicense.com)
 * [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
