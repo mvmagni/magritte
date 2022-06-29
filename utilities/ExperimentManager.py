@@ -1,6 +1,7 @@
 from DataExperiment import DataExperiment
 import DataExperimentSupport as des
 import pickle
+from performance_utils import PerformanceStore
 
 # Note to self: self, you need to add alot more comments
 class ExperimentManager:
@@ -9,6 +10,7 @@ class ExperimentManager:
                  project_name,
                  experiment_name,
                  untrained_model,
+                 experiment_method,
                  data_package):
 
         self.isDataPackageLoaded = False
@@ -20,6 +22,7 @@ class ExperimentManager:
         self.add_data_package(data_package=data_package)
 
         self.add_experiment(experiment_name=experiment_name,
+                            experiment_method=experiment_method,
                             untrained_model=untrained_model)
 
     def add_data_package(self,
@@ -30,10 +33,12 @@ class ExperimentManager:
 
     def add_experiment(self,
                        experiment_name,
+                       experiment_method,
                        untrained_model):
 
         de = DataExperiment(projectName=self.project_name,
                             experimentName=experiment_name,
+                            experiment_method=experiment_method,
                             dataPackage=self.data_package,
                             untrained_model=untrained_model)
         self.experiments.append(de)
@@ -61,8 +66,9 @@ class ExperimentManager:
                        axis_labels,
                        n_jobs=-1,
                        index=None):
-        openProc = f'-------------------------------------------------------'
-        closeProc = f'======================================================='
+        monitor_all = PerformanceStore()
+        openProc = ''.ljust(75,'-')
+        closeProc = ''.ljust(75, '=')
         if self.data_package.isProcessed is False:
             print(f'Data package has not been processed. Processing now.')
             print(openProc)
@@ -72,11 +78,15 @@ class ExperimentManager:
         if index is None:
             # process all experiments
             for idx, exp in enumerate(self.experiments):
+                monitor_individual = PerformanceStore()
                 print(f'')
                 print(openProc)
                 print(f'Processing experiment: [{idx}] {exp.experimentName}')
+                print(f'')
                 exp.process(axis_labels=axis_labels,
                             n_jobs=n_jobs)
+                print(f'')
+                print(f'Completed. {monitor_individual.end_timer()}')
                 print(closeProc)
                 print(f'')
         else:
@@ -85,8 +95,9 @@ class ExperimentManager:
                                             n_jobs=n_jobs)
 
         print(f'')
-        print(f'Processing experiments complete.')
         self.show_model_comparison()
+        print(f'')
+        print(f'Processing experiments complete. {monitor_all.end_timer()}')
 
     def display_experiment_summary(self,
                                    axisLabels,
@@ -100,6 +111,7 @@ class ExperimentManager:
             exp.display()
 
     def show_model_comparison(self):
+        print(f'Processing complete. Displaying model comparison')
         results = None
         id_var = None
         value_vars = None

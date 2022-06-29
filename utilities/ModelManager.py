@@ -3,14 +3,15 @@ class ModelManager:
 
     def __init__(self,
                  model,
+                 method,
                  description):
         
         self.model_list = []
-        self.add_model(model, description)
+        self.add_model(model, method, description)
     
     # Add model to list
-    def add_model(self, model, description):
-        self.model_list.append (ModelStore(model, description))
+    def add_model(self, model, method, description):
+        self.model_list.append (ModelStore(model, method, description))
     
     
     # Displays a list of all stored models
@@ -55,15 +56,34 @@ class ModelStore:
     
     def __init__(self,
                  model,
+                 method,
                  description):
-    
+        self.valid_methods = ['supervised', 'unsupervised']
+
         self.model = model
+        self.method = method
         self.description = description
-        
-        
+
         self.has_shap_values = False
         self.shap_values = None
-    
+
+        self.check_input()
+
+
+    def check_input(self):
+        isOk = False
+        e_message = ''
+
+        for x in self.valid_methods:
+            if x == method:
+                isOk = True
+                e_message = f'Invalid method submitted. Use: {valid_methods}'
+        try:
+            assert(isOk is True)
+        except AssertionError as e:
+            e.args += e_message
+            raise
+
     def set_shap_values(self,
                         shap_values):
         self.has_shap_values = True

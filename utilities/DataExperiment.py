@@ -4,7 +4,7 @@ import ShapSupport as sSupp
 import copy
 import pickle
 import pandas as pd
-
+from performance_utils import PerformanceStore
 
 # Note to self: self, you need to add alot more comments
 class DataExperiment:
@@ -12,10 +12,12 @@ class DataExperiment:
     def __init__(self,
                  projectName,
                  experimentName,
+                 experiment_method,
                  untrained_model,
                  dataPackage):
         self.projectName = projectName
         self.experimentName = experimentName
+        self.experiment_method = experiment_method
         self.__setDataPackage(dataPackage=dataPackage)
         self.__setUntrainedModel(untrained_model)
 
@@ -48,20 +50,40 @@ class DataExperiment:
         self.shap_values = None
 
         # ===============================================
-
+        self.check_input()
         self.display()
+
+    def check_input(self):
+        valid_methods = ['supervised', 'unsupervised']
+        isOk = False
+        e_message = ''
+
+        for x in valid_methods:
+            if x == self.experiment_method:
+                isOk = True
+
+            if not isOk:
+                e_message = f'Invalid method submitted.'
+
+        try:
+            assert (isOk is True)
+        except AssertionError as e:
+            e.args += (e_message, f'Use: {", ".join(valid_methods)}')
+            raise
+
 
     def display(self):
         indent = '---> '
         print(f'DataExperiment summary:')
         print(f'{indent}projectName: {self.projectName}')
         print(f'{indent}experimentName: {self.experimentName}')
+        print(f'{indent}experimentMethod: {self.experiment_method}')
         print(f'{indent}isDataPackageLoaded: {self.isDataPackageLoaded}')
 
         print(f'{indent}isProcessed: {self.isProcessed}')
         print(f'{indent}isModelLoaded: {self.isModelLoaded}')
         print(f'{indent}isModelPredicted: {self.isModelPredicted}')
-        print(f'{indent}isModelLearningCurveCreated: {self.isLearningCurveCreated}')
+        print(f'{indent}isLearningCurveCreated: {self.isLearningCurveCreated}')
 
         print(f'{indent}isUntrainedModelLoaded: {self.isUntrainedModelLoaded}')
         print(self.getUntrainedModel())
@@ -81,13 +103,17 @@ class DataExperiment:
         self.isDataPackageLoaded = True
 
     def createModel(self):
-        print(f'Training model for {self.experimentName}')
+        monitor = PerformanceStore()
+        print(f'Training model for {self.experimentName}. ', end='')
         model = des.createModel(data=self.dataPackage.getTrainData(),
                                 uniqueColumn=self.dataPackage.uniqueColumn,
                                 targetColumn=self.dataPackage.targetColumn,
-                                untrained_model=self.getUntrainedModel())
+                                untrained_model=self.getUntrainedModel(),
+                                experiment_method=self.experiment_method)
 
         self.__setModel(model)
+
+        print(f'Completed. {monitor.end_timer()}')
         self.predictModel()
 
     def __setModel(self, model):
@@ -136,6 +162,7 @@ class DataExperiment:
                                                             colPredict=colPredict), sigDigs)
 
     def showModelStats(self):
+        print(f'')
         print(f'Model Stats:')
         #print(f'Accuracy: {self.modelAccuracy}')
         #print(f'Precision: {self.modelPrecision}')
@@ -147,7 +174,9 @@ class DataExperiment:
 
         des.show_model_summary(data_frame=df,
                                id_var=id_var,
-                               value_vars=value_vars)
+                               value_vars=value_vars,
+                               individual=True,
+                               title=f'Model summary for {self.experimentName}')
         print(f'')
 
     def getModelStats_Frame(self,
@@ -181,7 +210,8 @@ class DataExperiment:
             return None
 
     def predictModel(self, average='weighted'):
-        print(f'Predicting model for {self.experimentName}')
+        monitor = PerformanceStore()
+        print(f'Predicting model for {self.experimentName}. ', end='')
         if self.isModelPredicted:
             display("Model already predicted. Displaying results:")
             self.showModelStats()
@@ -197,6 +227,7 @@ class DataExperiment:
                                   colPredict=colPredict,
                                   average=average)
 
+        print(f'Completed. {monitor.end_timer()}')
         self.showModelStats()
 
     def analyzeModelFeatureImportance(self,
@@ -249,7 +280,7 @@ class DataExperiment:
                 axis_labels,
                 n_jobs=-1):
         self.createModel()
-        self.createModelLearningCurve(n_jobs=n_jobs)
+        #self.createModelLearningCurve(n_jobs=n_jobs)
         #self.showModelReport(axis_labels)
         self.isProcessed = True
 
@@ -312,7 +343,7 @@ class DataExperiment:
                                      YTest=self.dataPackage.getYTestData()
                                      )
 
-    # Do features include the target and unique? DOn't think so but can't recall
+    # Do features include the target and unique? Don't think so but can't recall
     def getFeatures(self):
         return self.dataPackage.dataFeatures
 
@@ -347,7 +378,7 @@ class DataExperiment:
                                    train_scores,
                                    test_scores,
                                    fit_times):
-        self.isModelLearningCurveCreated = True
+        self.isLearningCurveCreated = True
         self.model_train_sizes = train_sizes
         self.model_train_scores = train_scores
         self.model_test_scores = test_scores
@@ -357,7 +388,7 @@ class DataExperiment:
                                axes=None,
                                ylim=(0.0, 1.01)
                                ):
-        if self.isModelLearningCurveCreated:
+        if self.isLearningCurveCreated:
 
             des.plot_learning_curve(train_sizes=self.model_train_sizes,
                                     train_scores=self.model_train_scores,

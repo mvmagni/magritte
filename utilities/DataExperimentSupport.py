@@ -27,7 +27,11 @@ from lime import lime_tabular
 from matplotlib.pyplot import xticks
 
 
-def createModel(data, uniqueColumn, targetColumn, untrained_model):
+def createModel(data,
+                uniqueColumn,
+                targetColumn,
+                untrained_model,
+                experiment_method):
     tDf = data.copy()
 
     # Get Y value from dataframe
@@ -41,7 +45,14 @@ def createModel(data, uniqueColumn, targetColumn, untrained_model):
 
     # fit model on training data
     model = copy.deepcopy(untrained_model)
-    model.fit(X, Y)
+
+    if experiment_method == 'supervised':
+        model.fit(X, Y)
+
+    elif experiment_method == 'unsupervised':
+        model.fit(X)
+    else:
+        print("Invalid experiment_method detected")
 
     return model
 
@@ -200,7 +211,7 @@ def showAllModelFeatureImportance(data,
            xlabel="Feature Importance")
     # sns.despine(left=True, bottom=True)
     sns.despine()
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
@@ -212,9 +223,6 @@ def showConfusionMatrix(data,
                         cmap='mako',
                         plotsize=2):
     plt.clf()
-    # cm = confusion_matrix(np.array(pd.to_numeric(data[colNameActual])).reshape(-1, 1),
-    #                      np.array(pd.to_numeric(data[colNamePredict])).reshape(-1, 1)
-    #                      )
 
     cm = confusion_matrix(np.array(data[colNameActual]).reshape(-1, 1),
                           np.array(data[colNamePredict]).reshape(-1, 1)
@@ -248,7 +256,7 @@ def showConfusionMatrix(data,
     plt.xlabel('Predicted', fontsize=15)
     # y-axis label with fontsize 15
     plt.ylabel('Actual', fontsize=15)
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
@@ -419,7 +427,7 @@ def plot_learning_curve(train_sizes,
     axes[2].set_ylabel("Score")
     axes[2].set_title("Performance of the model")
 
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
@@ -610,16 +618,17 @@ def plot_history(history):
     plt.title('Training and validation recall')
     plt.legend()
 
-    plt.show()
-    plt.clf()
+    _ = plt.show()
+    plt.close()
 
 
 def show_model_summary(data_frame,
                        id_var,
-                       value_vars):
-
+                       value_vars,
+                       individual=False,
+                       title='Experiment comparison'):
     value_name = 'value_name'
-    var_name = 'metric'
+    var_name = 'Metric'
 
     tDF = pd.melt(data_frame,
                   id_vars=id_var,
@@ -628,18 +637,26 @@ def show_model_summary(data_frame,
                   value_name=value_name
                   )
 
-    plt.clf()
-    fig = plt.figure(figsize=(10, 10))
-    plot = sns.catplot(x=id_var,
-                       y=value_name,
-                       hue=var_name,
-                       data=tDF,
-                       kind='bar')
-    plt.title(f'Model Comparison')
-    plt.ylim(0, 1)
-    plt.ylabel('Metric value')
-    plt.xlabel('Experiment')
+    plt.close();
+
+    # plt.figure(figsize=(10, 10) )
+    # fig, ax = plt.subplots(figsize=(10,10))
+    gfg = sns.catplot(x=id_var,
+                      y=value_name,
+                      hue=var_name,
+                      data=tDF,
+                      kind='bar',
+                      height=6,
+                      aspect=1)
+
+    gfg.set(ylim=(0, 1))
+    if individual:
+        gfg.set(xlabel=None,
+                xticklabels=[],
+                ylabel="Metric Value",
+                title=title)
+    else:
+        gfg.set(xlabel='Experiment', ylabel="Metric Value", title=title)
     plt.show()
-    plt.clf()
 
     print(data_frame.head())
