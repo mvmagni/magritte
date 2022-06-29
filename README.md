@@ -12,7 +12,7 @@
 [![Forks][forks-shield]][forks-url]
 [![Stargazers][stars-shield]][stars-url]
 [![Issues][issues-shield]][issues-url]
-[![MIT License][license-shield]][license-url]
+[![GPL License][license-shield]][license-url]
 
 <!--
 [![LinkedIn][linkedin-shield]][linkedin-url]
@@ -20,19 +20,16 @@
 
 
 <!-- PROJECT LOGO -->
-<br />
 <div align="center">
   <a href="https://github.com/mvmagni/magritte">
     <img src="resources/bowler.jpg" alt="Logo" width="200" height="200"/>
   </a>
 
-  <h3 align="center">NLP Pipeline</h3>
+  <h2 align="center">NLP Pipeline</h2>
 
   <p align="center">
-    Machine learning pipeline for NLP projects
+    The goal of this project it to create a simplified machine learning pipeline for NLP projects. Implementing common features,functionality, 
     <br />
-    <br />
-    <a href="https://github.com/mvmagni/magritte/documents"><strong>Explore the docs</strong></a>
     <br />
       <a href="https://github.com/mvmagni/magritte/issues"><strong>Report Bug/Request Feature</strong></a>
     <br />
@@ -44,108 +41,70 @@
 <details open>
   <summary>Table of Contents</summary>
   <ol>
-    <li>
-      <a href="#about-the-project">About The Project</a>
-    </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
+    <li><a href="#about-the-project">About The Project</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#roadmap">Roadmap</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments and Resources</a></li>
   </ol>
-</details>
-
 
 
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-<!--
-[![Product Name Screen Shot][product-screenshot]](https://example.com)
--->
+The purpose of this project is to create a flexible, reusable, and simplified pipeline for NLP processing. The goal is to incorporate the main processes, flows, and reporting for NLP projects so that your time is spent on solving the problem and not integrating code. 
 
-There are many great README templates available on GitHub; however, I didn't find one that really suited my needs so I created this enhanced one. I want to create a README template so amazing that it'll be the last one you ever need -- I think this is it.
-
-Here's why:
-* Your time should be focused on creating something amazing. A project that solves a problem and helps others
-* You shouldn't be doing the same tasks over and over like creating a README from scratch
-* You should implement DRY principles to the rest of your life :smile:
-
-Of course, no one template will serve all projects since your needs may be different. So I'll be adding more in the near future. You may also suggest changes by forking this repo and creating a pull request or opening an issue. Thanks to all the people have contributed to expanding this template!
+No single pipeline will meet all needs. So I'll be adding more in the near future. Thanks to all the people have contributed to expanding this template!
 
 <p align="right">(<a href="#top">back to top</a>)</p>
+</details>
+
+
+<!-- FEATURES -->
+<!--
+## Features
+
+TODO: Add high level feature examples
+
+_For more examples, please refer to the [Documentation](https://example.com)_
+
+<p align="right">(<a href="#top">back to top</a>)</p>
+-->
+
 
 
 <!-- GETTING STARTED -->
 ## Getting Started
 
-This is an example of how you may give instructions on setting up your project locally.
-To get a local copy up and running follow these simple example steps.
+Demonstration notebooks are included showing feature usage in both Colab environment and local usage. 
 
-### Prerequisites
+<strong>Google Colab</strong>
+1. Open one of the notebooks in the <a href="demo_colab">demo_colab</a> directory
+2. Click the colab badge on the notebook to open in Colab
+3. Running notebook will download code and show feature usage
+   
 
-This is an example of how to list things you need to use the software and how to install them.
-* npm
-  ```sh
-  npm install npm@latest -g
-  ```
-
-### Installation
-
-_Below is an example of how you can instruct your audience on installing and setting up your app. This template doesn't rely on any external dependencies or services._
-
-1. Get a free API Key at [https://example.com](https://example.com)
-2. Clone the repo
-   ```sh
-   git clone https://github.com/your_username_/Project-Name.git
-   ```
-3. Install NPM packages
-   ```sh
-   npm install
-   ```
-4. Enter your API in `config.js`
-   ```js
-   const API_KEY = 'ENTER YOUR API';
-   ```
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- USAGE EXAMPLES -->
-## Usage
-
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
-
-_For more examples, please refer to the [Documentation](https://example.com)_
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
+<strong>Local</strong>
+1. Clone the repo (`git clone https://github.com/mvmagni/magritte`)
+2. Open one of the notebooks in the root directory
+3. Running notebook will show feature usage
 
 
 <!-- ROADMAP -->
 ## Roadmap
+Roadmap only represents high level tasks. Does not include all items or indicate order of implementation
 
-- [x] Add Changelog
-- [x] Add back to top links
-- [ ] Add Additional Templates w/ Examples
-- [ ] Add "components" document to easily copy & paste sections of the readme
-- [ ] Multi-language Support
-    - [ ] Chinese
-    - [ ] Spanish
+- [ ] Add data exploration utilities
+- [ ] Add support for unsupervised workflow
+- [ ] Add support for tensorflow models
+- [ ] Improve visuals in experiment summaries
+- [ ] Package for pip install
 
 See the [open issues](https://github.com/mvmagni/magritte/issues) for a full list of proposed features (and known issues).
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
 
 
 <!-- CONTRIBUTING -->
@@ -164,16 +123,12 @@ Don't forget to give the project a star! Thanks again!
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 
-
-
 <!-- LICENSE -->
 ## License
 
 Distributed under the GPLv3 License. See `LICENSE.md` for more information.
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
 
 <!-- CONTACT -->
 
@@ -184,27 +139,6 @@ Twitter - [@Ghost_in_the_NN](https://twitter.com/Ghost_in_the_NN)
 Project Link: [https://github.com/mvmagni/magritte](https://github.com/mvmagni/magritte)
 
 <p align="right">(<a href="#top">back to top</a>)</p>
-
-
-
-<!-- ACKNOWLEDGMENTS -->
-
-## Acknowledgments and Resources
-
-Helpful resources and background information
-
-* [Choose an Open Source License](https://choosealicense.com)
-* [GitHub Emoji Cheat Sheet](https://www.webpagefx.com/tools/emoji-cheat-sheet)
-* [Malven's Flexbox Cheatsheet](https://flexbox.malven.co/)
-* [Malven's Grid Cheatsheet](https://grid.malven.co/)
-* [Img Shields](https://shields.io)
-* [GitHub Pages](https://pages.github.com)
-* [Font Awesome](https://fontawesome.com)
-* [React Icons](https://react-icons.github.io/react-icons/search)
-* [Markdown Template](https://github.com/othneildrew/Best-README-Template)
-
-<p align="right">(<a href="#top">back to top</a>)</p>
-
 
 
 <!-- MARKDOWN LINKS & IMAGES -->
@@ -221,4 +155,4 @@ Helpful resources and background information
 [license-url]: https://github.com/mvmagni/magritte/blob/master/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/in/othneildrew
-[product-screenshot]: images/screenshot.png
+
