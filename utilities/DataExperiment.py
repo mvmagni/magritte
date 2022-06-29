@@ -12,12 +12,12 @@ class DataExperiment:
     def __init__(self,
                  projectName,
                  experimentName,
-                 classifier,
+                 untrained_model,
                  dataPackage):
         self.projectName = projectName
         self.experimentName = experimentName
         self.__setDataPackage(dataPackage=dataPackage)
-        self.__setClassifier(classifier)
+        self.__setUntrainedModel(untrained_model)
 
         # Should really consider putting these into a function
         # Following are default values on init for stuff set later
@@ -63,16 +63,16 @@ class DataExperiment:
         print(f'{indent}isModelPredicted: {self.isModelPredicted}')
         print(f'{indent}isModelLearningCurveCreated: {self.isLearningCurveCreated}')
 
-        print(f'{indent}isClassifierLoaded: {self.isClassifierLoaded}')
-        print(self.getClassifier())
+        print(f'{indent}isUntrainedModelLoaded: {self.isUntrainedModelLoaded}')
+        print(self.getUntrainedModel())
         print('')
 
-    def getClassifier(self):
-        return copy.deepcopy(self.classifier)
+    def getUntrainedModel(self):
+        return copy.deepcopy(self.untrained_model)
 
-    def __setClassifier(self, classifier):
-        self.classifier = classifier
-        self.isClassifierLoaded = True
+    def __setUntrainedModel(self, untrained_model):
+        self.untrained_model = untrained_model
+        self.isUntrainedModelLoaded = True
 
     def __setDataPackage(self,
                          dataPackage):
@@ -85,7 +85,7 @@ class DataExperiment:
         model = des.createModel(data=self.dataPackage.getTrainData(),
                                 uniqueColumn=self.dataPackage.uniqueColumn,
                                 targetColumn=self.dataPackage.targetColumn,
-                                classifier=self.getClassifier())
+                                untrained_model=self.getUntrainedModel())
 
         self.__setModel(model)
         self.predictModel()
@@ -289,7 +289,7 @@ class DataExperiment:
             print('Model ROCAUC not calculated. Starting now')
             viz = des.showROCAUC(dataTrain=self.dataPackage.getTrainData(),
                                  dataTest=self.dataPackage.getTestData(),
-                                 classifier=self.getClassifier(),
+                                 classifier=self.getUntrainedModel(),
                                  axisLabels=axisLabels,
                                  colNameActual=self.dataPackage.targetColumn,
                                  features=self.getFeatures())
@@ -328,7 +328,7 @@ class DataExperiment:
         else:
             df = self.dataPackage.getTrainData()
             train_sizes, train_scores, test_scores, fit_times = des.create_learning_curve(
-                estimator=self.getClassifier(),
+                estimator=self.getUntrainedModel(),
                 X=df[self.dataPackage.dataFeatures],
                 y=df[self.dataPackage.targetColumn],
                 cv=cv,

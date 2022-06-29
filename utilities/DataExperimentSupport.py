@@ -27,7 +27,7 @@ from lime import lime_tabular
 from matplotlib.pyplot import xticks
 
 
-def createModel(data, uniqueColumn, targetColumn, classifier):
+def createModel(data, uniqueColumn, targetColumn, untrained_model):
     tDf = data.copy()
 
     # Get Y value from dataframe
@@ -40,7 +40,7 @@ def createModel(data, uniqueColumn, targetColumn, classifier):
     X = tDf.to_numpy()
 
     # fit model on training data
-    model = copy.deepcopy(classifier)
+    model = copy.deepcopy(untrained_model)
     model.fit(X, Y)
 
     return model

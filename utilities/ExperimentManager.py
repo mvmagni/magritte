@@ -8,7 +8,7 @@ class ExperimentManager:
     def __init__(self,
                  project_name,
                  experiment_name,
-                 classifier,
+                 untrained_model,
                  data_package):
 
         self.isDataPackageLoaded = False
@@ -20,7 +20,7 @@ class ExperimentManager:
         self.add_data_package(data_package=data_package)
 
         self.add_experiment(experiment_name=experiment_name,
-                            classifier=classifier)
+                            untrained_model=untrained_model)
 
     def add_data_package(self,
                          data_package):
@@ -30,12 +30,12 @@ class ExperimentManager:
 
     def add_experiment(self,
                        experiment_name,
-                       classifier):
+                       untrained_model):
 
         de = DataExperiment(projectName=self.project_name,
                             experimentName=experiment_name,
                             dataPackage=self.data_package,
-                            classifier=classifier)
+                            untrained_model=untrained_model)
         self.experiments.append(de)
 
     def list_experiments(self):

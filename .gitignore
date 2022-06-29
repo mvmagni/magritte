@@ -1,2 +1,6 @@
 
 .ipynb_checkpoints/
+
+testExperimentManager.pk.gz
+
+utilities/__pycache__/
