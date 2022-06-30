@@ -4,3 +4,7 @@
 testExperimentManager.pk.gz
 
 utilities/__pycache__/
+
+demo/testDataPackage.pkl.gz
+
+demo/testDataProcParams.pkl.gz
