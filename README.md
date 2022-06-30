@@ -22,7 +22,7 @@
 <!-- PROJECT LOGO -->
 <div align="center">
   <a href="https://github.com/mvmagni/magritte">
-    <img src="resources/bowler.jpg" alt="Logo" width="200" height="200"/>
+    <img src="resources/ceci.jpg" alt="Logo" width="200" height="200"/>
   </a>
 
   <h2 align="center">NLP Pipeline</h2>
