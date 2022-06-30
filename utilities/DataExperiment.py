@@ -6,6 +6,7 @@ import pickle
 import pandas as pd
 from performance_utils import PerformanceStore
 
+
 # Note to self: self, you need to add alot more comments
 class DataExperiment:
 
@@ -71,9 +72,9 @@ class DataExperiment:
             e.args += (e_message, f'Use: {", ".join(valid_methods)}')
             raise
 
-
     def display(self):
         indent = '---> '
+        print(f'')
         print(f'DataExperiment summary:')
         print(f'{indent}projectName: {self.projectName}')
         print(f'{indent}experimentName: {self.experimentName}')
@@ -164,11 +165,11 @@ class DataExperiment:
     def showModelStats(self):
         print(f'')
         print(f'Model Stats:')
-        #print(f'Accuracy: {self.modelAccuracy}')
-        #print(f'Precision: {self.modelPrecision}')
-        #print(f'Recalll: {self.modelRecall}')
-        #print(f'F1 Score: {self.modelF1}')
-        #print(f'Cohen kappa:: {self.modelCohenKappa}')
+        # print(f'Accuracy: {self.modelAccuracy}')
+        # print(f'Precision: {self.modelPrecision}')
+        # print(f'Recalll: {self.modelRecall}')
+        # print(f'F1 Score: {self.modelF1}')
+        # print(f'Cohen kappa:: {self.modelCohenKappa}')
 
         id_var, value_vars, df = self.getModelStats_Frame(exp_label=self.experimentName)
 
@@ -276,12 +277,8 @@ class DataExperiment:
                                   topn=topn,
                                   useLasso=useLasso)
 
-    def process(self,
-                axis_labels,
-                n_jobs=-1):
+    def process(self):
         self.createModel()
-        #self.createModelLearningCurve(n_jobs=n_jobs)
-        #self.showModelReport(axis_labels)
         self.isProcessed = True
 
     def showModelReport(self,
@@ -291,7 +288,7 @@ class DataExperiment:
                         upperValue=0.01,
                         useLasso=False,
                         topn=5):
-                            
+
         self.showModelStats()
 
         des.showReport(data=self.getModelPrediction(),
@@ -304,10 +301,10 @@ class DataExperiment:
         self.showModelLearningCurve()
         self.showModelROCAUC(axisLabels=axisLabels)
         self.showModelFeatureImportance(startValue=startValue,
-                                            increment=increment,
-                                            upperValue=upperValue,
-                                            useLasso=useLasso,
-                                            topn=topn)
+                                        increment=increment,
+                                        upperValue=upperValue,
+                                        useLasso=useLasso,
+                                        topn=topn)
         self.showLimeGlobalImportance()
         self.showLimeLocalImportance()
 
@@ -328,13 +325,13 @@ class DataExperiment:
             viz.show()
 
     def __setModelROCAUC(self,
-                             visualizer):
+                         visualizer):
         self.isModelROCAUCCalculated = True
         self.modelROCAUC = pickle.dumps(visualizer)
 
     def __getModelROCAUC(self):
         return pickle.loads(self.modelROCAUC)
-        
+
     def showPrecisionRecallCurve(self):
         des.showPrecisionRecallCurve(model=self.getModel(),
                                      XTrain=self.dataPackage.getXTrainData(),
@@ -355,7 +352,7 @@ class DataExperiment:
         # If it is already predicted just show it
         if self.isLearningCurveCreated:
             print('Model learning curve already calculated. Displaying results:')
-            #self.showLearningCurve()
+            # self.showLearningCurve()
         else:
             df = self.dataPackage.getTrainData()
             train_sizes, train_scores, test_scores, fit_times = des.create_learning_curve(
@@ -372,12 +369,11 @@ class DataExperiment:
                                         test_scores=test_scores,
                                         fit_times=fit_times)
 
-
     def __setModelLearningData(self,
-                                   train_sizes,
-                                   train_scores,
-                                   test_scores,
-                                   fit_times):
+                               train_sizes,
+                               train_scores,
+                               test_scores,
+                               fit_times):
         self.isLearningCurveCreated = True
         self.model_train_sizes = train_sizes
         self.model_train_scores = train_scores
@@ -449,3 +445,44 @@ class DataExperiment:
         self.shap_values = shap_values
         self.hasSHAPValues = True
 
+    def show_cluster_comparison(self):
+        # Requirements:
+        # Unsupervised with target column present
+        if self.experiment_method == 'unsupervised' and self.dataPackage.targetColumn is not None:
+
+            # Get clean data
+            cleanDF = self.dataPackage.getCleanData()
+
+            # Get test data
+            testDF = self.dataPackage.getTestData()
+            testDF = testDF[[self.dataPackage.uniqueColumn]].copy()
+
+            # Get prediction info
+            predDF = self.getModelPrediction()
+
+            # Assemble frame for reporting
+            # concat the predictions with the test data (subset of full data)
+            result = pd.concat([testDF.reset_index(drop=True), predDF.reset_index(drop=True)], axis=1)
+            result = pd.merge(result, cleanDF, on=self.dataPackage.uniqueColumn, how='inner')
+
+            # Validate merge results
+            summary = result.loc[~(result[self.modelPredictionColActual] == result[self.dataPackage.targetColumn])]
+            try:
+                assert (len(summary) == 0)
+            except AssertionError as e:
+                e.args += ('Merge errors with cluster comparison. Inconsistent merge results between original ' +
+                           'target column and prediction column')
+                raise
+
+            # pass frame to function for processing
+            des.show_cluster_comparison(result,
+                                        self.dataPackage.dataColumn,
+                                        self.modelPredictionColActual,
+                                        self.modelPredictionColPredict)
+
+
+        else:
+            print('Experiment needs to be unsupervised with a target column')
+            print(f'Experiment name: {self.experimentName}')
+            print(f'Experiment method: {self.experiment_method}')
+            print(f'Target column: {self.dataPackage.targetColumn}')

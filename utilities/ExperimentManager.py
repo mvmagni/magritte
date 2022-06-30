@@ -3,6 +3,7 @@ import DataExperimentSupport as des
 import pickle
 from performance_utils import PerformanceStore
 
+
 # Note to self: self, you need to add alot more comments
 class ExperimentManager:
 
@@ -63,11 +64,9 @@ class ExperimentManager:
             self.list_models()
 
     def run_experiment(self,
-                       axis_labels,
-                       n_jobs=-1,
                        index=None):
         monitor_all = PerformanceStore()
-        openProc = ''.ljust(75,'-')
+        openProc = ''.ljust(75, '-')
         closeProc = ''.ljust(75, '=')
         if self.data_package.isProcessed is False:
             print(f'Data package has not been processed. Processing now.')
@@ -83,16 +82,14 @@ class ExperimentManager:
                 print(openProc)
                 print(f'Processing experiment: [{idx}] {exp.experimentName}')
                 print(f'')
-                exp.process(axis_labels=axis_labels,
-                            n_jobs=n_jobs)
+                exp.process()
                 print(f'')
                 print(f'Completed. {monitor_individual.end_timer()}')
                 print(closeProc)
                 print(f'')
         else:
             print(f'Processing experiment: {self.experiements[index].experimentName}')
-            self.experiments[index].process(axis_labels=axis_labels,
-                                            n_jobs=n_jobs)
+            self.experiments[index].process()
 
         print(f'')
         self.show_model_comparison()
@@ -117,8 +114,8 @@ class ExperimentManager:
         value_vars = None
         # get info from each experiment
         for idx, exp in enumerate(self.experiments):
-            #print(f'Collecting info from experiment: [{idx}] {exp.experimentName}')
-            #exp_label = f'Experiment {idx}'
+            # print(f'Collecting info from experiment: [{idx}] {exp.experimentName}')
+            # exp_label = f'Experiment {idx}'
             exp_label = exp.experimentName
             if results is None:
                 id_var, value_vars, results = exp.getModelStats_Frame(exp_label=exp_label)
@@ -155,6 +152,3 @@ class ExperimentManager:
     def load(cls, filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
-
-
-

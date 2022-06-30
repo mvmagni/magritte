@@ -25,6 +25,7 @@ from yellowbrick.classifier import PrecisionRecallCurve
 import lime
 from lime import lime_tabular
 from matplotlib.pyplot import xticks
+from wordcloud import WordCloud
 
 
 def createModel(data,
@@ -102,7 +103,7 @@ def getModelFeatureImportance(model,
         impDf.rename(columns={'index': featureLabel}, inplace=True)
 
     else:
-        raise ("no feature_importances_ or coef_ found in model")
+        raise "no feature_importances_ or coef_ found in model"
 
     return impDf, featureLabel, valueLabel
 
@@ -514,7 +515,7 @@ def showLimeGlobalImportance(XTrain,
     lr.fit(XTrain_scale, YTrain)
 
     with plt.style.context("ggplot"):
-        fig = plt.figure(figsize=(10, 15))
+        _ = plt.figure(figsize=(10, 15))
         plt.barh(range(len(lr.coef_[0])), lr.coef_[0], color=["red" if coef < 0 else "green" for coef in lr.coef_[0]])
         plt.yticks(range(len(lr.coef_[0])), features)
         plt.title("Global Importance: Weights")
@@ -637,7 +638,7 @@ def show_model_summary(data_frame,
                   value_name=value_name
                   )
 
-    plt.close();
+    plt.close()
 
     # plt.figure(figsize=(10, 10) )
     # fig, ax = plt.subplots(figsize=(10,10))
@@ -660,3 +661,61 @@ def show_model_summary(data_frame,
     plt.show()
 
     print(data_frame.head())
+
+
+def getWordCloud(text):
+    if len(text) == 0:
+        genText = "[No_Text]"
+    else:
+        genText = text
+
+    return WordCloud().generate(str(genText))
+
+
+def show_cluster_comparison(srcDF,
+                            textCol,
+                            colNameActual,
+                            colNamePredict):
+    # Find out how many unique values we have to deal with
+    a = srcDF[colNameActual].unique().tolist()
+    b = srcDF[colNamePredict].unique().tolist()
+    uniqueVals = list(set(a + b))
+    uniqueVals.sort()
+
+    plt.close()
+    fig, axs = plt.subplots(len(uniqueVals), 2, figsize=(20, 10))
+
+    for x in uniqueVals:
+        # get Text for actual
+        tmpDFActual = srcDF[srcDF[colNameActual] == x].copy()
+        textActual = tmpDFActual[textCol].values
+
+        # get Text for predicted
+        tmpDFPred = srcDF[srcDF[colNamePredict] == x]
+        textPred = tmpDFPred[textCol].values
+
+        # add the charts
+        axs[x, 0].set_title(f'Actual: {x}', fontsize=15, loc='left')
+        axs[x, 0].axis('off')
+        _ = axs[x, 0].imshow(getWordCloud(textActual))
+
+        axs[x, 1].set_title(f'Predicted: {x}', fontsize=15, loc='left')
+        axs[x, 1].axis('off')
+        _ = axs[x, 1].imshow(getWordCloud(textPred))
+
+    plt.tight_layout()
+    plt.show()
+
+    print(f'')
+    print(f'Current results of mapping between clusters and actuals')
+    sumDF = srcDF[[colNameActual, colNamePredict]].copy()
+    sumDF = sumDF.groupby([colNameActual, colNamePredict]).size().to_frame('record_count')
+    sumDF.reset_index(inplace=True)
+    sumDF = sumDF.sort_values(by='record_count', ascending=False, inplace=False)
+    sumDF.reset_index(drop=True, inplace=True)
+    print(sumDF.head())
+
+    print(f'')
+    print(f'Recommended mapping')
+    idx = sumDF.groupby(['y_pred'])['record_count'].transform(max) == sumDF['record_count']
+    print(sumDF[idx].head())

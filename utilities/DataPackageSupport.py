@@ -21,37 +21,39 @@ def clean_text_column(dataFrame,
     print(f'Cleaning text column...')
     if data_package_params is None:  # Use defaults from cleanText package
         dataFrame[data_column] = dataFrame[data_column].progress_apply(lambda x: clean(x))
-    else: # Use those stored in data_package_params
-        dataFrame[data_column] = dataFrame[data_column].progress_apply(lambda x: cleanText(input=x,
+    else:  # Use those stored in data_package_params
+        dataFrame[data_column] = dataFrame[data_column].progress_apply(lambda x: cleanText(inputText=x,
                                                                                            data_package_params=data_package_params))
 
-def cleanText(input,data_package_params):
-    x = clean(input,
-          fix_unicode=data_package_params.fix_unicode,  # fix various unicode errors
-          to_ascii=data_package_params.to_ascii,  # transliterate to closest ASCII representation
-          lower=data_package_params.lower,  # lowercase text
-          no_line_breaks=data_package_params.no_line_breaks,
-          # fully strip line breaks as opposed to only normalizing them
-          no_urls=data_package_params.no_urls,  # replace all URLs with a special token
-          no_emails=data_package_params.no_emails,  # replace all email addresses with a special token
-          no_phone_numbers=data_package_params.no_phone_numbers,  # replace all phone numbers with a special token
-          no_numbers=data_package_params.no_numbers,  # replace all numbers with a special token
-          no_digits=data_package_params.no_digits,  # replace all digits with a special token
-          no_currency_symbols=data_package_params.no_currency_symbols,
-          # replace all currency symbols with a special token
-          no_punct=data_package_params.no_punct,  # remove punctuations
-          replace_with_punct=data_package_params.replace_with_punct,
-          # instead of removing punctuations you may replace them
-          replace_with_url=data_package_params.replace_with_url,
-          replace_with_email=data_package_params.replace_with_email,
-          replace_with_phone_number=data_package_params.replace_with_phone_number,
-          replace_with_number=data_package_params.replace_with_number,
-          replace_with_digit=data_package_params.replace_with_digit,
-          replace_with_currency_symbol=data_package_params.replace_with_currency_symbol,
-          lang=data_package_params.lang  # set to 'de' for German special handling
-          )
+
+def cleanText(inputText, data_package_params):
+    x = clean(inputText,
+              fix_unicode=data_package_params.fix_unicode,  # fix various unicode errors
+              to_ascii=data_package_params.to_ascii,  # transliterate to closest ASCII representation
+              lower=data_package_params.lower,  # lowercase text
+              no_line_breaks=data_package_params.no_line_breaks,
+              # fully strip line breaks as opposed to only normalizing them
+              no_urls=data_package_params.no_urls,  # replace all URLs with a special token
+              no_emails=data_package_params.no_emails,  # replace all email addresses with a special token
+              no_phone_numbers=data_package_params.no_phone_numbers,  # replace all phone numbers with a special token
+              no_numbers=data_package_params.no_numbers,  # replace all numbers with a special token
+              no_digits=data_package_params.no_digits,  # replace all digits with a special token
+              no_currency_symbols=data_package_params.no_currency_symbols,
+              # replace all currency symbols with a special token
+              no_punct=data_package_params.no_punct,  # remove punctuations
+              replace_with_punct=data_package_params.replace_with_punct,
+              # instead of removing punctuations you may replace them
+              replace_with_url=data_package_params.replace_with_url,
+              replace_with_email=data_package_params.replace_with_email,
+              replace_with_phone_number=data_package_params.replace_with_phone_number,
+              replace_with_number=data_package_params.replace_with_number,
+              replace_with_digit=data_package_params.replace_with_digit,
+              replace_with_currency_symbol=data_package_params.replace_with_currency_symbol,
+              lang=data_package_params.lang  # set to 'de' for German special handling
+              )
 
     return x
+
 
 def remove_stopwords(dataFrame,
                      data_column,
@@ -77,7 +79,7 @@ def process_TFIDF(dataFrame,
         # No extra columns requested. return as is
         return tDf
     else:
-        # Get a copy of the extra columns (e.g uuid, target column)
+        # Get a copy of the extra columns (e.g. uuid, target column)
         tDfUn = dataFrame[columns_in_output].copy()
 
         # Merge extra columns to encoded frame
