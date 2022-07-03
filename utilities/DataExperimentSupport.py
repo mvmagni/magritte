@@ -699,7 +699,7 @@ def show_cluster_comparison(srcDF,
         axs[x, 0].axis('off')
         _ = axs[x, 0].imshow(getWordCloud(textActual))
 
-        axs[x, 1].set_title(f'Predicted: {x}', fontsize=15, loc='left')
+        axs[x, 1].set_title(f'Cluster: {x}', fontsize=15, loc='left')
         axs[x, 1].axis('off')
         _ = axs[x, 1].imshow(getWordCloud(textPred))
 
@@ -707,7 +707,7 @@ def show_cluster_comparison(srcDF,
     plt.show()
 
     print(f'')
-    print(f'Current results of mapping between clusters and actuals')
+    print(f'Current results of comparison between clusters and actuals')
     sumDF = srcDF[[colNameActual, colNamePredict]].copy()
     sumDF = sumDF.groupby([colNameActual, colNamePredict]).size().to_frame('record_count')
     sumDF.reset_index(inplace=True)
@@ -717,5 +717,5 @@ def show_cluster_comparison(srcDF,
 
     print(f'')
     print(f'Recommended mapping')
-    idx = sumDF.groupby(['y_pred'])['record_count'].transform(max) == sumDF['record_count']
+    idx = sumDF.groupby([colNamePredict])['record_count'].transform(max) == sumDF['record_count']
     print(sumDF[idx].head())
