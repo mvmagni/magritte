@@ -18,17 +18,20 @@ class DataExperiment:
                  dataPackage):
         self.projectName = projectName
         self.experimentName = experimentName
-        self.experiment_method = experiment_method
+        self.experiment_method = experiment_method # [supervised | unsupervised]
+        self.has_been_automapped = False # If unsupervised and Target available predictions can be mapped
+
         self.__setDataPackage(dataPackage=dataPackage)
         self.__setUntrainedModel(untrained_model)
 
-        # Should really consider putting these into a function
+        # Really need to re-architect this. Grown too big for current architecture
         # Following are default values on init for stuff set later
         self.isModelLoaded = False
         self.Model = None
 
         self.isModelPredicted = False
         self.modelPrediction = None
+        self.unmappedPrediction = None # stores model prediction if unsupervised with target and mapped
         self.modelAccuracy = None
         self.modelPrecision = None
         self.modelRecall = None
@@ -79,6 +82,9 @@ class DataExperiment:
         print(f'{indent}projectName: {self.projectName}')
         print(f'{indent}experimentName: {self.experimentName}')
         print(f'{indent}experimentMethod: {self.experiment_method}')
+        if self.is_unsupervised_with_target():
+            print(f'{indent}Unsupervised experiment with target column {self.dataPackage.targetColumn}')
+            print(f'{indent}{indent}prediction has been mapped: {self.has_been_automapped}')
         print(f'{indent}isDataPackageLoaded: {self.isDataPackageLoaded}')
 
         print(f'{indent}isProcessed: {self.isProcessed}')
@@ -445,44 +451,112 @@ class DataExperiment:
         self.shap_values = shap_values
         self.hasSHAPValues = True
 
-    def show_cluster_comparison(self):
+    # Cluster can be auto mapped to actual target column
+    def is_unsupervised_with_target(self):
+        if self.experiment_method == 'unsupervised' and self.dataPackage.targetColumn is not None:
+            return True
+        else:
+            return False
+
+    def __get_mapping_data(self):
+
+        # Get clean data
+        cleanDF = self.dataPackage.getCleanData()
+
+        # Get test data
+        testDF = self.dataPackage.getTestData()
+        testDF = testDF[[self.dataPackage.uniqueColumn]].copy()
+
+        # Get prediction info
+        predDF = self.getModelPrediction()
+
+        # Assemble frame for reporting
+        # concat the predictions with the test data (subset of full data)
+        result = pd.concat([testDF.reset_index(drop=True), predDF.reset_index(drop=True)], axis=1)
+        result = pd.merge(result, cleanDF, on=self.dataPackage.uniqueColumn, how='inner')
+
+        # Validate merge results
+        summary = result.loc[~(result[self.modelPredictionColActual] == result[self.dataPackage.targetColumn])]
+        try:
+            assert (len(summary) == 0)
+        except AssertionError as e:
+            e.args += ('Merge errors with cluster comparison. Inconsistent merge results between original ' +
+                       'target column and prediction column')
+            raise
+
+        return result
+
+
+    def show_cluster_mapping_cloud(self):
         # Requirements:
         # Unsupervised with target column present
-        if self.experiment_method == 'unsupervised' and self.dataPackage.targetColumn is not None:
+        if self.is_unsupervised_with_target():
 
-            # Get clean data
-            cleanDF = self.dataPackage.getCleanData()
-
-            # Get test data
-            testDF = self.dataPackage.getTestData()
-            testDF = testDF[[self.dataPackage.uniqueColumn]].copy()
-
-            # Get prediction info
-            predDF = self.getModelPrediction()
-
-            # Assemble frame for reporting
-            # concat the predictions with the test data (subset of full data)
-            result = pd.concat([testDF.reset_index(drop=True), predDF.reset_index(drop=True)], axis=1)
-            result = pd.merge(result, cleanDF, on=self.dataPackage.uniqueColumn, how='inner')
-
-            # Validate merge results
-            summary = result.loc[~(result[self.modelPredictionColActual] == result[self.dataPackage.targetColumn])]
-            try:
-                assert (len(summary) == 0)
-            except AssertionError as e:
-                e.args += ('Merge errors with cluster comparison. Inconsistent merge results between original ' +
-                           'target column and prediction column')
-                raise
 
             # pass frame to function for processing
-            des.show_cluster_comparison(result,
-                                        self.dataPackage.dataColumn,
-                                        self.modelPredictionColActual,
-                                        self.modelPredictionColPredict)
+            des.show_cluster_mapping_cloud(srcDF=self.__get_mapping_data(),
+                                           textCol=self.dataPackage.dataColumn,
+                                           colNameActual=self.modelPredictionColActual,
+                                           colNamePredict=self.modelPredictionColPredict)
+        else:
+            print('Experiment needs to be unsupervised with a target column')
+            print(f'Experiment name: {self.experimentName}')
+            print(f'Experiment method: {self.experiment_method}')
+            print(f'Target column: {self.dataPackage.targetColumn}')
 
+    def get_unsupervised_mapping(self,
+                                 showNumResults=5,
+                                 auto_mapping=False):
+        # Requirements:
+        # Unsupervised with target column present
+        if self.is_unsupervised_with_target():
+
+
+            map_pred_to_actual = des.get_unsupervised_mapping(srcDF=self.__get_mapping_data(),
+                                                              colNameActual=self.modelPredictionColActual,
+                                                              colNamePredict=self.modelPredictionColPredict,
+                                                              showNumResults=showNumResults)
+            # Do we need to automap the predictions
+            if auto_mapping and map_pred_to_actual is not None:
+                print(f'Auto mapping the results')
+                print(f'Mapping predicted to actual: {map_pred_to_actual}')
+                self.set_prediction_mapping(map_pred_to_actual=map_pred_to_actual)
+            else:
+                print(f'Display automapped prediction to actual results (no data changed)')
+                print(map_pred_to_actual)
+
+            return map_pred_to_actual
 
         else:
             print('Experiment needs to be unsupervised with a target column')
             print(f'Experiment name: {self.experimentName}')
             print(f'Experiment method: {self.experiment_method}')
             print(f'Target column: {self.dataPackage.targetColumn}')
+
+
+    def set_prediction_mapping(self,
+                               map_pred_to_actual):
+        # map_pred_to_act: dict with prediction to actual mappings
+
+        # get prediction
+        current_prediction = self.getModelPrediction().copy()
+
+        # copy predict column
+        orig_predict_col = f'{self.modelPredictionColPredict}_orig'
+        current_prediction[orig_predict_col] = current_prediction[self.modelPredictionColPredict]
+
+        # update predict column with mapping for all values
+        for key in map_pred_to_actual:
+            current_prediction.loc[current_prediction[orig_predict_col]==key,
+                                   self.modelPredictionColPredict] = map_pred_to_actual[key]
+
+        current_prediction = current_prediction.drop(columns=[orig_predict_col])
+
+        # Save old modelPrediction
+        self.unmappedPrediction = self.getModelPrediction().copy()
+
+        # Set prediction to mapped prediction and set to automapped
+        self.has_been_automapped = True
+        self.__setModelPrediction(predictionData=current_prediction,
+                                  colActual=self.modelPredictionColActual,
+                                  colPredict=self.modelPredictionColPredict)

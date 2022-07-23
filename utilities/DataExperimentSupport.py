@@ -671,11 +671,13 @@ def getWordCloud(text):
 
     return WordCloud().generate(str(genText))
 
-
-def show_cluster_comparison(srcDF,
-                            textCol,
-                            colNameActual,
-                            colNamePredict):
+# Show comparison for unsupervised model with a target column
+# Used for determining how to map predicted in unsupervised to
+# an actual target columnn
+def show_cluster_mapping_cloud(srcDF,
+                               textCol,
+                               colNameActual,
+                               colNamePredict):
     # Find out how many unique values we have to deal with
     a = srcDF[colNameActual].unique().tolist()
     b = srcDF[colNamePredict].unique().tolist()
@@ -684,6 +686,7 @@ def show_cluster_comparison(srcDF,
 
     plt.close()
     fig, axs = plt.subplots(len(uniqueVals), 2, figsize=(20, 10))
+    plt.tight_layout()
 
     for x in uniqueVals:
         # get Text for actual
@@ -706,6 +709,17 @@ def show_cluster_comparison(srcDF,
     plt.tight_layout()
     plt.show()
 
+# unsupervised results to a target column for accuracy,etc
+def get_unsupervised_mapping(srcDF,
+                             colNameActual,
+                             colNamePredict,
+                             showNumResults=5):
+    # Find out how many unique values we have to deal with
+    unique_act = srcDF[colNameActual].unique().tolist()
+    unique_pred = srcDF[colNamePredict].unique().tolist()
+    uniqueVals = list(set(unique_act + unique_pred))
+    uniqueVals.sort()
+
     print(f'')
     print(f'Current results of comparison between clusters and actuals')
     sumDF = srcDF[[colNameActual, colNamePredict]].copy()
@@ -713,9 +727,68 @@ def show_cluster_comparison(srcDF,
     sumDF.reset_index(inplace=True)
     sumDF = sumDF.sort_values(by='record_count', ascending=False, inplace=False)
     sumDF.reset_index(drop=True, inplace=True)
-    print(sumDF.head())
-
+    print(sumDF.head(showNumResults))
+    print(f'Unique values in {colNameActual}: {len(unique_act)}')
+    print(f'Unique values in {colNamePredict}: {len(unique_pred)}')
+    print(f'Unique values in {colNameActual} and {colNamePredict}: {len(uniqueVals)}')
+    print(f'Number of rows/combinations: {len(sumDF)}')
     print(f'')
-    print(f'Recommended mapping')
-    idx = sumDF.groupby([colNamePredict])['record_count'].transform(max) == sumDF['record_count']
-    print(sumDF[idx].head())
+
+
+    map_act_to_pred = dict()
+    map_pred_to_act = dict()
+
+    # Loop through table to find matching
+    for ind in srcDF.index:
+        ind_actual = srcDF[colNameActual][ind]
+        ind_pred = srcDF[colNamePredict][ind]
+
+        #print(f'Actual: {ind_actual}, Predicted: {ind_pred}')
+
+        # Neither the actual nor the predicted should exist
+        if ind_actual not in map_act_to_pred and ind_pred not in map_pred_to_act:
+            #print(f'ind_actual and ind_pred do not exist. Adding to dict')
+            map_act_to_pred[ind_actual] = ind_pred
+            map_pred_to_act[ind_pred] = ind_actual
+
+    #print(f'map_act_to_pred: {map_act_to_pred}')
+    #print(f'map_pred_to_act: {map_pred_to_act}')
+
+    # Find out if any mappings have not been made
+
+    # Remove any unique_act that appear in map_act_to_pred
+    #print(f'unique_act: {unique_act}')
+    for x in map_act_to_pred:
+        #print(f'Removing {x} from unique_act')
+        unique_act.remove(x)
+
+    #print(f'unique_act: {unique_act}')
+    for y in map_pred_to_act:
+        #print(f'Removing {y} from unique_pred')
+        unique_pred.remove(y)
+
+    #print(f'length of unique_act: {len(unique_act)}')
+    #print(f'length of unique_pred: {len(unique_pred)}')
+
+    if len(unique_act)==0 and len(unique_pred)==0:
+        # everything accounted for. all good
+        print(f'All mappings appear in predictions. All good')
+    elif len(unique_act)==1 and len(unique_pred)==1:
+        # only one mapping not completed. Add
+        print(f'One mapping not found in predictions. Adding to map')
+        map_act_to_pred[unique_act[0]] = unique_pred[0]
+        map_pred_to_act[unique_pred[0]] = unique_act[0]
+    else:
+        print('Multiple mappings missing. Unable to automap.')
+        print(f'Actuals without mapping: {unique_act}')
+        print(f'Predictions without mapping: {unique_pred}')
+        return None
+
+
+    return map_pred_to_act
+
+
+
+
+
+

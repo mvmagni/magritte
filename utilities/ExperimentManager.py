@@ -45,11 +45,12 @@ class ExperimentManager:
         self.experiments.append(de)
 
     def list_experiments(self):
-        print(f'idx Processed Experiment name')
+        print(f'idx Processed Method      Experiment name')
         for count, exp in enumerate(self.experiments):
             idx = '{0: >3}'.format(count)
             status = '{0: >9}'.format(str(exp.isProcessed))
-            print(f'{idx} {status} {exp.experimentName}')
+            method = '{0: >12}'.format(str(exp.experiment_method))
+            print(f'{idx} {status} {method} {exp.experimentName}')
 
     # Remove model from list using model index from "list_models"
     def remove_experiment(self, experiment_index):
@@ -88,7 +89,7 @@ class ExperimentManager:
                 print(closeProc)
                 print(f'')
         else:
-            print(f'Processing experiment: {self.experiements[index].experimentName}')
+            print(f'Processing experiment: {self.experiments[index].experimentName}')
             self.experiments[index].process()
 
         print(f'')
