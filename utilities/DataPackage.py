@@ -2,6 +2,7 @@ import DataPackageSupport as dps
 import pickle
 import gzip
 
+
 class DataPackage:
     __version = 0.2
 
@@ -14,12 +15,11 @@ class DataPackage:
         self.isProcessed = False
         # TODO Needs to be updated to deal with unsupervised
         self.targetColumn = target_column
+        self.cleanData = None
 
         self.__setOrigData(original_data, unique_column)
 
         self.dataColumn = data_column
-
-
 
         if data_package_params is None:
             self.hasDataPackageParams = False
@@ -45,12 +45,11 @@ class DataPackage:
         self.workingData = origData.copy()
         self.isWorkingDataLoaded = True
 
-        #Get and set features listing, removing unique and target columns
+        # Get and set features listing, removing unique and target columns
         self.dataFeatures = list(self.workingData.columns)
-        # Remove unique and target columnm
+        # Remove unique and target column
         self.dataFeatures.remove(self.uniqueColumn)
         self.dataFeatures.remove(self.targetColumn)
-
 
     # if the data gets changed then we need to
     # invalidate all the results/work done previously
@@ -59,6 +58,9 @@ class DataPackage:
         self.isCleaned = False
         self.isEncoded = False
         self.isStopWorded = False
+
+        self.isCleanDataLoaded = False
+        self.cleanData = None
 
         self.__clearTrainTestData()
 
@@ -102,6 +104,9 @@ class DataPackage:
             self.display()
             print(f'Processing data package with provided parameters')
 
+            ##################################
+            # Text Cleaning
+
             # classbalance undersample
             self.classBalanceUndersample(sampleSize=self.data_package_params.sample_size)
 
@@ -110,6 +115,12 @@ class DataPackage:
 
             # remove stopwords
             self.remove_stopwords(stopword_language=self.data_package_params.stopword_language)
+
+            # Done cleaning, now save "cleaned" dataframe for use later
+            self.__setCleanData(self.getWorkingData())
+
+            ##################################
+            # Text encoding
 
             # process_TFIDF
             self.process_TFIDF(max_features=self.data_package_params.max_features)
@@ -144,7 +155,7 @@ class DataPackage:
     def remove_stopwords(self, stopword_language='english'):
         dps.remove_stopwords(dataFrame=self.workingData,
                              data_column=self.dataColumn,
-                             stopword_language='english'
+                             stopword_language=stopword_language
                              )
         self.isStopWorded = True
 
@@ -176,19 +187,39 @@ class DataPackage:
         print(self.dataFeatures)
         print(f'')
 
+    def getCleanData(self):
+        if self.isCleanDataLoaded:
+            return self.cleanData
+        else:
+            print('Clean data has not been saved')
+
+    def __setCleanData(self, cleanData):
+        self.cleanData = cleanData
+        self.isCleanDataLoaded = True
+
     def __setTrainData(self, trainData):
         self.trainData = trainData
         self.isTrainDataLoaded = True
 
     def getTrainData(self):
-        return self.trainData
+        if self.isTrainDataLoaded:
+            return self.trainData
+        else:
+            print('Train data has not been loaded')
 
     def __setTestData(self, testData):
         self.testData = testData
         self.isTestDataLoaded = True
 
     def getTestData(self):
-        return self.testData
+        if self.isTestDataLoaded:
+            return self.testData
+        else:
+            print("Test data has not been loaded")
+
+    def __clearCleanData(self):
+        self.cleanData = None
+        self.isCleanDataLoaded = False
 
     def __clearOrigData(self):
         self.origData = None
@@ -223,9 +254,10 @@ class DataPackage:
         self.isTrainTestSplit = True
 
     def getOrigData(self):
-        if self.isOrigDataLoaded == False:
+        if self.isOrigDataLoaded:
+            return self.origData
+        else:
             display("Original data frame is not loaded")
-        return self.origData
 
     def getWorkingData(self):
         return self.workingData
@@ -241,24 +273,35 @@ class DataPackage:
         print(f'{indent}dataColumn: {self.dataColumn}')
         print(f'{indent}targetColumn: {self.targetColumn}')
 
+        print(f'{emptySpace}Data:')
+        print(f'{indent}isOrigDataLoaded: {self.isOrigDataLoaded}')
+        print(f'{indent}isWorkingDataLoaded: {self.isWorkingDataLoaded}')
+        print(f'{indent}isCleanDataLoaded: {self.isCleanDataLoaded}')
+        print(f'{indent}isTrainDataLoaded: {self.isTrainDataLoaded}')
+        print(f'{indent}isTestDataLoaded: {self.isTrainDataLoaded}')
+        print(f'')
+
         print(f'{emptySpace}Original Data:')
         print(f'{indent}original data shape: {self.origData.shape}')
+        print(f'{emptySpace}Cleaned Data:')
+        if self.cleanData is None:
+            print(f'{indent}clean data shape: "N/A"')
+        else:
+            print(f'{indent}{indent}clean data shape: {self.cleanData.shape}')
         print(f'{emptySpace}Working Data:')
         print(f'{indent}working data shape: {self.workingData.shape}')
+        print(f'')
 
         print(f'{emptySpace}Process:')
         print(f'{indent}isProcessed: {self.isProcessed}')
         print(f'{indent}isCleaned: {self.isCleaned}')
         print(f'{indent}isStopWorded: {self.isStopWorded}')
+
         print(f'{indent}isBalanced: {self.isBalanced}')
         print(f'{indent}isEncoded: {self.isEncoded}')
         print(f'{indent}isTrainTestSplit: {self.isTrainTestSplit}')
 
-        print(f'{emptySpace}Data:')
-        print(f'{indent}isOrigDataLoaded: {self.isOrigDataLoaded}')
-        print(f'{indent}isTrainDataLoaded: {self.isTrainDataLoaded}')
-        print(f'{indent}isTestDataLoaded: {self.isTrainDataLoaded}')
-        print(f'')
+
 
     def displayClassBalance(self, columnName=None, verbose=False, showRecords=5):
         if columnName is None:
@@ -326,7 +369,6 @@ class DataPackage:
             return pickle.load(f)
 
 
-
 class DataPackageParams:
     __version = 0.1
 
@@ -346,7 +388,7 @@ class DataPackageParams:
 
     def __init__(self,
                  # Process package on load?
-                 process_params=True, # True to process package on load
+                 process_params=True,  # True to process package on load
 
                  # Class Balance
                  sample_size=None,  # Can be set to an absolute value. None means undersample to smallest
@@ -384,9 +426,8 @@ class DataPackageParams:
 
                  # Encoding params
                  encoding_type='TFIDF',
-                 max_features=100 # Currently only used in TFIDF
+                 max_features=100  # Currently only used in TFIDF
                  ):
-
         # Process package
         self.process_params = process_params
 
@@ -424,9 +465,6 @@ class DataPackageParams:
         self.random_state = random_state
         self.shuffle = shuffle
 
-
         # Encoding params
         self.encoding_type = encoding_type
         self.max_features = max_features
-
-

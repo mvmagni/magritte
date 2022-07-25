@@ -1,6 +1,8 @@
 from DataExperiment import DataExperiment
 import DataExperimentSupport as des
 import pickle
+from performance_utils import PerformanceStore
+
 
 # Note to self: self, you need to add alot more comments
 class ExperimentManager:
@@ -8,7 +10,8 @@ class ExperimentManager:
     def __init__(self,
                  project_name,
                  experiment_name,
-                 classifier,
+                 untrained_model,
+                 experiment_method,
                  data_package):
 
         self.isDataPackageLoaded = False
@@ -20,7 +23,8 @@ class ExperimentManager:
         self.add_data_package(data_package=data_package)
 
         self.add_experiment(experiment_name=experiment_name,
-                            classifier=classifier)
+                            experiment_method=experiment_method,
+                            untrained_model=untrained_model)
 
     def add_data_package(self,
                          data_package):
@@ -30,20 +34,23 @@ class ExperimentManager:
 
     def add_experiment(self,
                        experiment_name,
-                       classifier):
+                       experiment_method,
+                       untrained_model):
 
         de = DataExperiment(projectName=self.project_name,
                             experimentName=experiment_name,
+                            experiment_method=experiment_method,
                             dataPackage=self.data_package,
-                            classifier=classifier)
+                            untrained_model=untrained_model)
         self.experiments.append(de)
 
     def list_experiments(self):
-        print(f'idx Processed Experiment name')
+        print(f'idx Processed Method      Experiment name')
         for count, exp in enumerate(self.experiments):
             idx = '{0: >3}'.format(count)
             status = '{0: >9}'.format(str(exp.isProcessed))
-            print(f'{idx} {status} {exp.experimentName}')
+            method = '{0: >12}'.format(str(exp.experiment_method))
+            print(f'{idx} {status} {method} {exp.experimentName}')
 
     # Remove model from list using model index from "list_models"
     def remove_experiment(self, experiment_index):
@@ -58,11 +65,10 @@ class ExperimentManager:
             self.list_models()
 
     def run_experiment(self,
-                       axis_labels,
-                       n_jobs=-1,
                        index=None):
-        openProc = f'-------------------------------------------------------'
-        closeProc = f'======================================================='
+        monitor_all = PerformanceStore()
+        openProc = ''.ljust(75, '-')
+        closeProc = ''.ljust(75, '=')
         if self.data_package.isProcessed is False:
             print(f'Data package has not been processed. Processing now.')
             print(openProc)
@@ -72,27 +78,30 @@ class ExperimentManager:
         if index is None:
             # process all experiments
             for idx, exp in enumerate(self.experiments):
+                monitor_individual = PerformanceStore()
                 print(f'')
                 print(openProc)
                 print(f'Processing experiment: [{idx}] {exp.experimentName}')
-                exp.process(axis_labels=axis_labels,
-                            n_jobs=n_jobs)
+                print(f'')
+                exp.process()
+                print(f'')
+                print(f'Completed. {monitor_individual.end_timer()}')
                 print(closeProc)
                 print(f'')
         else:
-            print(f'Processing experiment: {self.experiements[index].experimentName}')
-            self.experiments[index].process(axis_labels=axis_labels,
-                                            n_jobs=n_jobs)
+            print(f'Processing experiment: {self.experiments[index].experimentName}')
+            self.experiments[index].process()
 
         print(f'')
-        print(f'Processing experiments complete.')
         self.show_model_comparison()
+        print(f'')
+        print(f'Processing experiments complete. {monitor_all.end_timer()}')
 
     def display_experiment_summary(self,
-                                   axisLabels,
+                                   axis_labels,
                                    index):
         print(f'Displaying summary for experiment: {self.experiments[index].experimentName}')
-        self.experiments[index].showModelReport(axisLabels=axisLabels)
+        self.experiments[index].showFullModelReport(axis_labels=axis_labels)
 
     def display(self):
         self.data_package.display()
@@ -100,13 +109,14 @@ class ExperimentManager:
             exp.display()
 
     def show_model_comparison(self):
+        print(f'Processing complete. Displaying model comparison')
         results = None
         id_var = None
         value_vars = None
         # get info from each experiment
         for idx, exp in enumerate(self.experiments):
-            #print(f'Collecting info from experiment: [{idx}] {exp.experimentName}')
-            #exp_label = f'Experiment {idx}'
+            # print(f'Collecting info from experiment: [{idx}] {exp.experimentName}')
+            # exp_label = f'Experiment {idx}'
             exp_label = exp.experimentName
             if results is None:
                 id_var, value_vars, results = exp.getModelStats_Frame(exp_label=exp_label)
@@ -143,6 +153,3 @@ class ExperimentManager:
     def load(cls, filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
-
-
-

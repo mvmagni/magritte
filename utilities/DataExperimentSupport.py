@@ -25,9 +25,14 @@ from yellowbrick.classifier import PrecisionRecallCurve
 import lime
 from lime import lime_tabular
 from matplotlib.pyplot import xticks
+from wordcloud import WordCloud
 
 
-def createModel(data, uniqueColumn, targetColumn, classifier):
+def createModel(data,
+                uniqueColumn,
+                targetColumn,
+                untrained_model,
+                experiment_method):
     tDf = data.copy()
 
     # Get Y value from dataframe
@@ -40,8 +45,15 @@ def createModel(data, uniqueColumn, targetColumn, classifier):
     X = tDf.to_numpy()
 
     # fit model on training data
-    model = copy.deepcopy(classifier)
-    model.fit(X, Y)
+    model = copy.deepcopy(untrained_model)
+
+    if experiment_method == 'supervised':
+        model.fit(X, Y)
+
+    elif experiment_method == 'unsupervised':
+        model.fit(X)
+    else:
+        print("Invalid experiment_method detected")
 
     return model
 
@@ -91,7 +103,7 @@ def getModelFeatureImportance(model,
         impDf.rename(columns={'index': featureLabel}, inplace=True)
 
     else:
-        raise ("no feature_importances_ or coef_ found in model")
+        raise "no feature_importances_ or coef_ found in model"
 
     return impDf, featureLabel, valueLabel
 
@@ -200,7 +212,7 @@ def showAllModelFeatureImportance(data,
            xlabel="Feature Importance")
     # sns.despine(left=True, bottom=True)
     sns.despine()
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
@@ -212,9 +224,6 @@ def showConfusionMatrix(data,
                         cmap='mako',
                         plotsize=2):
     plt.clf()
-    # cm = confusion_matrix(np.array(pd.to_numeric(data[colNameActual])).reshape(-1, 1),
-    #                      np.array(pd.to_numeric(data[colNamePredict])).reshape(-1, 1)
-    #                      )
 
     cm = confusion_matrix(np.array(data[colNameActual]).reshape(-1, 1),
                           np.array(data[colNamePredict]).reshape(-1, 1)
@@ -248,11 +257,11 @@ def showConfusionMatrix(data,
     plt.xlabel('Predicted', fontsize=15)
     # y-axis label with fontsize 15
     plt.ylabel('Actual', fontsize=15)
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
-def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
+def showReport(data, colNameActual, colNamePredict, axis_labels, titleSuffix):
     # results = metrics.classification_report(pd.to_numeric(data[colNameActual]).to_list(),
     #                                        data[colNamePredict].to_list(),
     #                                        zero_division=0)
@@ -266,7 +275,7 @@ def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
     showConfusionMatrix(data=data,
                         colNameActual=colNameActual,
                         colNamePredict=colNamePredict,
-                        axis_labels=axisLabels,
+                        axis_labels=axis_labels,
                         titleSuffix=titleSuffix
                         )
 
@@ -274,11 +283,11 @@ def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
 def showROCAUC(dataTrain,
                dataTest,
                classifier,
-               axisLabels,
+               axis_labels,
                colNameActual,
                features):
     model = classifier
-    visualizer = ROCAUC(model, classes=axisLabels)
+    visualizer = ROCAUC(model, classes=axis_labels)
 
     # Fit the training data to the visualizer
     visualizer.fit(dataTrain[features],
@@ -419,7 +428,7 @@ def plot_learning_curve(train_sizes,
     axes[2].set_ylabel("Score")
     axes[2].set_title("Performance of the model")
 
-    plt.show()
+    _ = plt.show()
     plt.clf()
 
 
@@ -475,7 +484,7 @@ def showPrecisionRecallCurve(model,
                              XTest,
                              YTest):
     # Create the visualizer, fit, score, and show it
-    viz = PrecisionRecallCurve(model)
+    viz = PrecisionRecallCurve(model, per_class=False)
     viz.fit(XTrain, YTrain)
     viz.score(XTest, YTest)
     viz.show()
@@ -506,7 +515,7 @@ def showLimeGlobalImportance(XTrain,
     lr.fit(XTrain_scale, YTrain)
 
     with plt.style.context("ggplot"):
-        fig = plt.figure(figsize=(10, 15))
+        _ = plt.figure(figsize=(10, 15))
         plt.barh(range(len(lr.coef_[0])), lr.coef_[0], color=["red" if coef < 0 else "green" for coef in lr.coef_[0]])
         plt.yticks(range(len(lr.coef_[0])), features)
         plt.title("Global Importance: Weights")
@@ -610,16 +619,17 @@ def plot_history(history):
     plt.title('Training and validation recall')
     plt.legend()
 
-    plt.show()
-    plt.clf()
+    _ = plt.show()
+    plt.close()
 
 
 def show_model_summary(data_frame,
                        id_var,
-                       value_vars):
-
+                       value_vars,
+                       individual=False,
+                       title='Experiment comparison'):
     value_name = 'value_name'
-    var_name = 'metric'
+    var_name = 'Metric'
 
     tDF = pd.melt(data_frame,
                   id_vars=id_var,
@@ -628,18 +638,157 @@ def show_model_summary(data_frame,
                   value_name=value_name
                   )
 
-    plt.clf()
-    fig = plt.figure(figsize=(10, 10))
-    plot = sns.catplot(x=id_var,
-                       y=value_name,
-                       hue=var_name,
-                       data=tDF,
-                       kind='bar')
-    plt.title(f'Model Comparison')
-    plt.ylim(0, 1)
-    plt.ylabel('Metric value')
-    plt.xlabel('Experiment')
+    plt.close()
+
+    # plt.figure(figsize=(10, 10) )
+    # fig, ax = plt.subplots(figsize=(10,10))
+    gfg = sns.catplot(x=id_var,
+                      y=value_name,
+                      hue=var_name,
+                      data=tDF,
+                      kind='bar',
+                      height=6,
+                      aspect=1.2)
+
+    gfg.set(ylim=(0, 1))
+    if individual:
+        gfg.set(xlabel=None,
+                xticklabels=[],
+                ylabel="Metric Value",
+                title=title)
+    else:
+        gfg.set(xlabel='Experiment', ylabel="Metric Value", title=title)
     plt.show()
-    plt.clf()
 
     print(data_frame.head())
+
+
+def getWordCloud(text):
+    if len(text) == 0:
+        genText = "[No_Text]"
+    else:
+        genText = text
+
+    return WordCloud().generate(str(genText))
+
+# Show comparison for unsupervised model with a target column
+# Used for determining how to map predicted in unsupervised to
+# an actual target columnn
+def show_cluster_mapping_cloud(srcDF,
+                               textCol,
+                               colNameActual,
+                               colNamePredict):
+    # Find out how many unique values we have to deal with
+    a = srcDF[colNameActual].unique().tolist()
+    b = srcDF[colNamePredict].unique().tolist()
+    uniqueVals = list(set(a + b))
+    uniqueVals.sort()
+
+    plt.close()
+    fig, axs = plt.subplots(len(uniqueVals), 2, figsize=(20, 10))
+    plt.tight_layout()
+
+    for x in uniqueVals:
+        # get Text for actual
+        tmpDFActual = srcDF[srcDF[colNameActual] == x].copy()
+        textActual = tmpDFActual[textCol].values
+
+        # get Text for predicted
+        tmpDFPred = srcDF[srcDF[colNamePredict] == x]
+        textPred = tmpDFPred[textCol].values
+
+        # add the charts
+        axs[x, 0].set_title(f'Actual: {x}', fontsize=15, loc='left')
+        axs[x, 0].axis('off')
+        _ = axs[x, 0].imshow(getWordCloud(textActual))
+
+        axs[x, 1].set_title(f'Cluster: {x}', fontsize=15, loc='left')
+        axs[x, 1].axis('off')
+        _ = axs[x, 1].imshow(getWordCloud(textPred))
+
+    plt.tight_layout()
+    plt.show()
+
+# unsupervised results to a target column for accuracy,etc
+def get_unsupervised_mapping(srcDF,
+                             colNameActual,
+                             colNamePredict,
+                             showNumResults=5):
+    # Find out how many unique values we have to deal with
+    unique_act = srcDF[colNameActual].unique().tolist()
+    unique_pred = srcDF[colNamePredict].unique().tolist()
+    uniqueVals = list(set(unique_act + unique_pred))
+    uniqueVals.sort()
+
+    print(f'')
+    print(f'Current results of comparison between clusters and actuals')
+    sumDF = srcDF[[colNameActual, colNamePredict]].copy()
+    sumDF = sumDF.groupby([colNameActual, colNamePredict]).size().to_frame('record_count')
+    sumDF.reset_index(inplace=True)
+    sumDF = sumDF.sort_values(by='record_count', ascending=False, inplace=False)
+    sumDF.reset_index(drop=True, inplace=True)
+    print(sumDF.head(showNumResults))
+    print(f'Unique values in {colNameActual}: {len(unique_act)}')
+    print(f'Unique values in {colNamePredict}: {len(unique_pred)}')
+    print(f'Unique values in {colNameActual} and {colNamePredict}: {len(uniqueVals)}')
+    print(f'Number of rows/combinations: {len(sumDF)}')
+    print(f'')
+
+
+    map_act_to_pred = dict()
+    map_pred_to_act = dict()
+
+    # Loop through table to find matching
+    for ind in sumDF.index:
+        ind_actual = sumDF[colNameActual][ind]
+        ind_pred = sumDF[colNamePredict][ind]
+
+        #print(f'Actual: {ind_actual}, Predicted: {ind_pred}')
+
+        # Neither the actual nor the predicted should exist
+        if ind_actual not in map_act_to_pred and ind_pred not in map_pred_to_act:
+            #print(f'ind_actual and ind_pred do not exist. Adding to dict')
+            map_act_to_pred[ind_actual] = ind_pred
+            map_pred_to_act[ind_pred] = ind_actual
+
+    #print(f'map_act_to_pred: {map_act_to_pred}')
+    #print(f'map_pred_to_act: {map_pred_to_act}')
+
+    # Find out if any mappings have not been made
+
+    # Remove any unique_act that appear in map_act_to_pred
+    #print(f'unique_act: {unique_act}')
+    for x in map_act_to_pred:
+        #print(f'Removing {x} from unique_act')
+        unique_act.remove(x)
+
+    #print(f'unique_act: {unique_act}')
+    for y in map_pred_to_act:
+        #print(f'Removing {y} from unique_pred')
+        unique_pred.remove(y)
+
+    #print(f'length of unique_act: {len(unique_act)}')
+    #print(f'length of unique_pred: {len(unique_pred)}')
+
+    if len(unique_act)==0 and len(unique_pred)==0:
+        # everything accounted for. all good
+        print(f'All mappings appear in predictions. All good')
+    elif len(unique_act)==1 and len(unique_pred)==1:
+        # only one mapping not completed. Add
+        print(f'One mapping not found in predictions. Adding to map')
+        map_act_to_pred[unique_act[0]] = unique_pred[0]
+        map_pred_to_act[unique_pred[0]] = unique_act[0]
+    else:
+        print('Multiple mappings missing. Unable to automap.')
+        print(f'Actuals without mapping: {unique_act}')
+        print(f'Predictions without mapping: {unique_pred}')
+        return None
+
+
+    return map_pred_to_act
+
+
+
+
+
+
