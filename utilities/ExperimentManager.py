@@ -98,10 +98,10 @@ class ExperimentManager:
         print(f'Processing experiments complete. {monitor_all.end_timer()}')
 
     def display_experiment_summary(self,
-                                   axisLabels,
+                                   axis_labels,
                                    index):
         print(f'Displaying summary for experiment: {self.experiments[index].experimentName}')
-        self.experiments[index].showModelReport(axisLabels=axisLabels)
+        self.experiments[index].showFullModelReport(axis_labels=axis_labels)
 
     def display(self):
         self.data_package.display()

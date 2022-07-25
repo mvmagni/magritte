@@ -287,8 +287,8 @@ class DataExperiment:
         self.createModel()
         self.isProcessed = True
 
-    def showModelReport(self,
-                        axisLabels,
+    def showFullModelReport(self,
+                        axis_labels,
                         startValue=0.0001,
                         increment=0.0001,
                         upperValue=0.01,
@@ -300,12 +300,12 @@ class DataExperiment:
         des.showReport(data=self.getModelPrediction(),
                        colNameActual=self.modelPredictionColActual,
                        colNamePredict=self.modelPredictionColPredict,
-                       axisLabels=axisLabels,
+                       axis_labels=axis_labels,
                        titleSuffix=self.experimentName)
 
         self.showPrecisionRecallCurve()
         self.showModelLearningCurve()
-        self.showModelROCAUC(axisLabels=axisLabels)
+        self.showModelROCAUC(axis_labels=axis_labels)
         self.showModelFeatureImportance(startValue=startValue,
                                         increment=increment,
                                         upperValue=upperValue,
@@ -314,7 +314,15 @@ class DataExperiment:
         self.showLimeGlobalImportance()
         self.showLimeLocalImportance()
 
-    def showModelROCAUC(self, axisLabels, useStored=False):
+    def showModelReport(self,
+                        axis_labels):
+        des.showReport(data=self.getModelPrediction(),
+                       colNameActual=self.modelPredictionColActual,
+                       colNamePredict=self.modelPredictionColPredict,
+                       axis_labels=axis_labels,
+                       titleSuffix=self.experimentName)
+
+    def showModelROCAUC(self, axis_labels, useStored=False):
         if useStored and self.isModelROCAUCCalculated:
             print('Model ROCAUC already calculated. Displaying stored results')
             tViz = self.__getModelROCAUC()
@@ -324,7 +332,7 @@ class DataExperiment:
             viz = des.showROCAUC(dataTrain=self.dataPackage.getTrainData(),
                                  dataTest=self.dataPackage.getTestData(),
                                  classifier=self.getUntrainedModel(),
-                                 axisLabels=axisLabels,
+                                 axis_labels=axis_labels,
                                  colNameActual=self.dataPackage.targetColumn,
                                  features=self.getFeatures())
             self.__setModelROCAUC(visualizer=viz)
@@ -354,7 +362,7 @@ class DataExperiment:
                                  cv=None,
                                  n_jobs=None,
                                  train_sizes=None,
-                                 verbose=4):
+                                 verbose=0):
         # If it is already predicted just show it
         if self.isLearningCurveCreated:
             print('Model learning curve already calculated. Displaying results:')
@@ -390,18 +398,19 @@ class DataExperiment:
                                axes=None,
                                ylim=(0.0, 1.01)
                                ):
-        if self.isLearningCurveCreated:
+        if not self.isLearningCurveCreated:
+            display('Model Learning curve has not yet been calculated. Calculating now')
+            self.createModelLearningCurve()
 
-            des.plot_learning_curve(train_sizes=self.model_train_sizes,
-                                    train_scores=self.model_train_scores,
-                                    test_scores=self.model_test_scores,
-                                    fit_times=self.model_fit_times,
-                                    title=self.experimentName,
-                                    axes=axes,
-                                    ylim=ylim
-                                    )
-        else:
-            display('Model Learning curve has not yet been calculated')
+        des.plot_learning_curve(train_sizes=self.model_train_sizes,
+                                train_scores=self.model_train_scores,
+                                test_scores=self.model_test_scores,
+                                fit_times=self.model_fit_times,
+                                title=self.experimentName,
+                                axes=axes,
+                                ylim=ylim
+                                )
+
 
     def showLimeGlobalImportance(self):
         des.showLimeGlobalImportance(XTrain=self.dataPackage.getXTrainData(),

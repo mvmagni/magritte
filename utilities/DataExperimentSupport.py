@@ -261,7 +261,7 @@ def showConfusionMatrix(data,
     plt.clf()
 
 
-def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
+def showReport(data, colNameActual, colNamePredict, axis_labels, titleSuffix):
     # results = metrics.classification_report(pd.to_numeric(data[colNameActual]).to_list(),
     #                                        data[colNamePredict].to_list(),
     #                                        zero_division=0)
@@ -275,7 +275,7 @@ def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
     showConfusionMatrix(data=data,
                         colNameActual=colNameActual,
                         colNamePredict=colNamePredict,
-                        axis_labels=axisLabels,
+                        axis_labels=axis_labels,
                         titleSuffix=titleSuffix
                         )
 
@@ -283,11 +283,11 @@ def showReport(data, colNameActual, colNamePredict, axisLabels, titleSuffix):
 def showROCAUC(dataTrain,
                dataTest,
                classifier,
-               axisLabels,
+               axis_labels,
                colNameActual,
                features):
     model = classifier
-    visualizer = ROCAUC(model, classes=axisLabels)
+    visualizer = ROCAUC(model, classes=axis_labels)
 
     # Fit the training data to the visualizer
     visualizer.fit(dataTrain[features],
@@ -484,7 +484,7 @@ def showPrecisionRecallCurve(model,
                              XTest,
                              YTest):
     # Create the visualizer, fit, score, and show it
-    viz = PrecisionRecallCurve(model)
+    viz = PrecisionRecallCurve(model, per_class=False)
     viz.fit(XTrain, YTrain)
     viz.score(XTest, YTest)
     viz.show()
@@ -648,7 +648,7 @@ def show_model_summary(data_frame,
                       data=tDF,
                       kind='bar',
                       height=6,
-                      aspect=1)
+                      aspect=1.2)
 
     gfg.set(ylim=(0, 1))
     if individual:
@@ -739,9 +739,9 @@ def get_unsupervised_mapping(srcDF,
     map_pred_to_act = dict()
 
     # Loop through table to find matching
-    for ind in srcDF.index:
-        ind_actual = srcDF[colNameActual][ind]
-        ind_pred = srcDF[colNamePredict][ind]
+    for ind in sumDF.index:
+        ind_actual = sumDF[colNameActual][ind]
+        ind_pred = sumDF[colNamePredict][ind]
 
         #print(f'Actual: {ind_actual}, Predicted: {ind_pred}')
 
