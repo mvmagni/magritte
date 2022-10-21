@@ -7,73 +7,126 @@ from sklearn.model_selection import train_test_split
 from nltk.corpus import stopwords
 from sklearn.feature_extraction.text import TfidfVectorizer
 import nltk
+import contractions
+from nltk import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+from imblearn.over_sampling import RandomOverSampler
 
 
 def create_unique_column(dataFrame,
                          unique_column='uuid'):
-    dataFrame[unique_column] = [uuid.uuid4() for _ in range(len(dataFrame.index))]
+    # Needs to be rewritten to get rid of "making changes to a slice of the data" warning
+    dataFrame['uuid'] = dataFrame.apply(lambda _: uuid.uuid4(), axis=1)
 
 
 def clean_text_column(dataFrame,
                       data_column,
-                      data_package_params=None):
-    tqdm.pandas()
-    print(f'Cleaning text column...')
-    if data_package_params is None:  # Use defaults from cleanText package
-        dataFrame[data_column] = dataFrame[data_column].progress_apply(lambda x: clean(x))
-    else:  # Use those stored in data_package_params
-        dataFrame[data_column] = dataFrame[data_column].progress_apply(lambda x: cleanText(inputText=x,
-                                                                                           data_package_params=data_package_params))
+                      data_package_params,
+                      process_count
+                      ):
+    #tqdm.pandas()
+    #tDf = dataFrame.copy()
+    #print(f'P{process_count} ', end='')
+    dataFrame[data_column] = dataFrame[data_column].apply(lambda x: processText(inputText=str(x),
+                                                                             data_package_params=data_package_params))
+    print(f'P{process_count} ', end='')
+    return dataFrame
 
+def processText(inputText, data_package_params):
+    x = inputText
 
-def cleanText(inputText, data_package_params):
-    x = clean(inputText,
-              fix_unicode=data_package_params.fix_unicode,  # fix various unicode errors
-              to_ascii=data_package_params.to_ascii,  # transliterate to closest ASCII representation
-              lower=data_package_params.lower,  # lowercase text
-              no_line_breaks=data_package_params.no_line_breaks,
-              # fully strip line breaks as opposed to only normalizing them
-              no_urls=data_package_params.no_urls,  # replace all URLs with a special token
-              no_emails=data_package_params.no_emails,  # replace all email addresses with a special token
-              no_phone_numbers=data_package_params.no_phone_numbers,  # replace all phone numbers with a special token
-              no_numbers=data_package_params.no_numbers,  # replace all numbers with a special token
-              no_digits=data_package_params.no_digits,  # replace all digits with a special token
-              no_currency_symbols=data_package_params.no_currency_symbols,
-              # replace all currency symbols with a special token
-              no_punct=data_package_params.no_punct,  # remove punctuations
-              replace_with_punct=data_package_params.replace_with_punct,
-              # instead of removing punctuations you may replace them
-              replace_with_url=data_package_params.replace_with_url,
-              replace_with_email=data_package_params.replace_with_email,
-              replace_with_phone_number=data_package_params.replace_with_phone_number,
-              replace_with_number=data_package_params.replace_with_number,
-              replace_with_digit=data_package_params.replace_with_digit,
-              replace_with_currency_symbol=data_package_params.replace_with_currency_symbol,
-              lang=data_package_params.lang  # set to 'de' for German special handling
-              )
+    if data_package_params.lower:
+        x = x.lower()
+
+    if data_package_params.fix_contractions:
+        x = fix_contractions(document=x)
+    
+    x = clean(x,
+                lower=False,  # lowercase text set to False. Done outside of this package
+                fix_unicode=data_package_params.fix_unicode,  # fix various unicode errors
+                to_ascii=data_package_params.to_ascii,  # transliterate to closest ASCII representation
+                no_line_breaks=data_package_params.no_line_breaks,
+                # fully strip line breaks as opposed to only normalizing them
+                no_urls=data_package_params.no_urls,  # replace all URLs with a special token
+                no_emails=data_package_params.no_emails,  # replace all email addresses with a special token
+                no_phone_numbers=data_package_params.no_phone_numbers,  # replace all phone numbers with a special token
+                no_numbers=data_package_params.no_numbers,  # replace all numbers with a special token
+                no_digits=data_package_params.no_digits,  # replace all digits with a special token
+                no_currency_symbols=data_package_params.no_currency_symbols,
+                # replace all currency symbols with a special token
+                no_punct=data_package_params.no_punct,  # remove punctuations
+                replace_with_punct=data_package_params.replace_with_punct,
+                # instead of removing punctuations you may replace them
+                replace_with_url=data_package_params.replace_with_url,
+                replace_with_email=data_package_params.replace_with_email,
+                replace_with_phone_number=data_package_params.replace_with_phone_number,
+                replace_with_number=data_package_params.replace_with_number,
+                replace_with_digit=data_package_params.replace_with_digit,
+                replace_with_currency_symbol=data_package_params.replace_with_currency_symbol,
+                lang=data_package_params.lang  # set to 'de' for German special handling
+                )
+
+    if data_package_params.lemmatize:
+        x = lemmatize(document=x)
+
+    if data_package_params.remove_small_tokens:
+        x = remove_small_tokens(document=x,
+                            data_package_params=data_package_params)
+
+    if data_package_params.remove_stopwords:
+        x = remove_stopwords(document=x,
+                                data_package_params=data_package_params)    
+
+    
 
     return x
 
+#Removing certain sized words
+def remove_small_tokens(document,
+                        data_package_params):
+    nltk.download('punkt', quiet=True)
+    new_doc = ' '.join([i for i in document.split() if len(i) > data_package_params.min_token_size])
+    return new_doc
 
-def remove_stopwords(dataFrame,
-                     data_column,
-                     stopword_language='english'):
-    tqdm.pandas()
-    print(f'Removing stopwords...')
-    nltk.download('stopwords')
-    stop = stopwords.words(stopword_language)
-    dataFrame[data_column] = dataFrame[data_column].progress_apply(
-        lambda x: ' '.join([word for word in x.split() if word not in stop]))
+
+def lemmatize(document):
+    nltk.download('wordnet', quiet=True)
+    nltk.download('omw-1.4', quiet=True)
+    nltk.download('punkt', quiet=True)
+    stemmer = WordNetLemmatizer()    
+    #new_doc = ' '.join([stemmer.lemmatize(word) for word in word_tokenize(document)])
+    new_doc = ' '.join([stemmer.lemmatize(word) for word in document.split()])
+    return new_doc
+
+def fix_contractions(document):
+    return contractions.fix(document)
+
+def remove_stopwords(document,
+                     data_package_params):
+    
+    nltk.download('stopwords', quiet=True)
+    nltk.download('punkt', quiet=True)
+    stop = stopwords.words(data_package_params.stopword_language)
+    if data_package_params.custom_stopwords is not None:
+        stop.extend(data_package_params.custom_stopwords)
+    
+    #new_doc = ' '.join([word for word in word_tokenize(document) if word not in stop])
+    new_doc = ' '.join([word for word in document.split() if word not in stop])
+    return new_doc
 
 
 def process_TFIDF(dataFrame,
                   data_column,
                   columns_in_output,
                   max_features=100):
+    # print(f'process_TFIDF: original dataFrame shape = {dataFrame.shape}')
+    # print(f'process_TFIDF: columns in output: {columns_in_output}')
     v = TfidfVectorizer(max_features=max_features)
     x = v.fit_transform(dataFrame[data_column])
     feature_names = v.get_feature_names_out()
     tDf = pd.DataFrame(data=x.toarray(), columns=feature_names)
+
+    # print(f'process_TFIDF: tDf shape after vectorize = {tDf.shape}')
 
     if columns_in_output is None:
         # No extra columns requested. return as is
@@ -81,10 +134,15 @@ def process_TFIDF(dataFrame,
     else:
         # Get a copy of the extra columns (e.g. uuid, target column)
         tDfUn = dataFrame[columns_in_output].copy()
+        # print(f'process_TFIDF: df extra columns shape to be merged = {tDfUn.shape}')
+
+        # reset indexes on both otherwise pd.concat goes funky
+        tDfUn.reset_index(inplace=True, drop=True)
+        tDf.reset_index(inplace=True, drop=True)
 
         # Merge extra columns to encoded frame
         retDF = pd.concat([tDfUn, tDf], axis=1)
-
+        # print(f'process_TFIDF: returning frame with shape = {retDF.shape}')
         # Return encoded frame with extra columns
         return retDF
 
@@ -103,6 +161,7 @@ def trainTestSplit(dataFrame,
                                        shuffle=shuffle
                                        )
     else:
+        print(f'Calling train_test_split with shuffle: {shuffle}')
         train, test = train_test_split(dataFrame,
                                        train_size=train_size,
                                        random_state=random_state,
@@ -158,8 +217,41 @@ def classBalanceUndersample(dataFrame,
                         columnName=columnName,
                         verbose=True)
 
-    # Return the balance dataset
+    # Return the balanced dataset
     return tDf
+
+
+def classBalanceOversample(dataFrame,
+                           columnName,
+                           random_state=987,
+                           verbose=True,
+                           show_records=5):
+    # Display the initial state
+    tDf = dataFrame.copy()
+    displayClassBalance(data=tDf,
+                        columnName=columnName,
+                        verbose=verbose,
+                        showRecords=show_records)
+    # Split dataset into X/Y
+    y_unbal = tDf[[columnName]].copy()
+    x_unbal = tDf.copy()
+    
+    
+    print(f'Oversampling data to match max class')
+    ros = RandomOverSampler(random_state=random_state)
+    x_bal, y_bal = ros.fit_resample(x_unbal, y_unbal)
+    
+    
+    displayClassBalance(data=x_bal,
+                        columnName=columnName,
+                        verbose=verbose,
+                        showRecords=show_records)
+
+    # Return the balanced dataset
+    # Note that we left all columns in x_unabl
+    # so x_bal will be balanced with all required columns
+    # no concat/merge required.
+    return x_bal
 
 
 def displayClassBalance(data,

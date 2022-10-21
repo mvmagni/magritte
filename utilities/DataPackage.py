@@ -1,6 +1,11 @@
 import DataPackageSupport as dps
 import pickle
 import gzip
+from dataclasses import dataclass, field
+from multiprocessing import Pool
+import pandas as pd
+import numpy as np
+from sklearn import preprocessing
 
 
 class DataPackage:
@@ -11,20 +16,18 @@ class DataPackage:
                  unique_column,
                  target_column,
                  data_column,
-                 data_package_params=None):
+                 data_package_params):
+        
         self.isProcessed = False
-        # TODO Needs to be updated to deal with unsupervised
         self.targetColumn = target_column
-        self.cleanData = None
-
-        self.__setOrigData(original_data, unique_column)
-
         self.dataColumn = data_column
-
-        if data_package_params is None:
-            self.hasDataPackageParams = False
-        else:
-            self.__setDataPackageParams(data_package_params=data_package_params)
+        
+        self.isImportantFeaturesApplied = False
+        self.isLabelEncoded = False            
+        self.labelEncoder = preprocessing.LabelEncoder()
+        
+        self.__setDataPackageParams(data_package_params=data_package_params)
+        self.__setOrigData(original_data, unique_column)
 
     # Set the original dataFrame (pandas)
     def __setOrigData(self, origData, unique_column):
@@ -36,17 +39,34 @@ class DataPackage:
         # WorkingData is what we will use for processing
         self.__setWorkingData(origData=origData)
 
+        # Do a label encoding on target column
+        self.__encodeTargetColumn()
+
         # A new dataframe means we need to reset our work
         self.__resetWork()
+
+
+    # label encode target column
+    def __encodeTargetColumn(self):
+        if not self.isLabelEncoded and self.targetColumn is not None:
+            print(f'Target column found. Label encoding target column.')
+            self.workingData[self.targetColumn] = self.labelEncoder.fit_transform(self.workingData[self.targetColumn])
+            self.isLabelEncoded = False
+            
+
 
     # Set working data. Leaves original dataframe intact
     def __setWorkingData(self,
                          origData):
         self.workingData = origData.copy()
         self.isWorkingDataLoaded = True
+        self.setDataFeatures(feature_list = self.workingData.columns)
 
+    # give feature_list including unique and target columns
+    def setDataFeatures(self,
+                        feature_list):
         # Get and set features listing, removing unique and target columns
-        self.dataFeatures = list(self.workingData.columns)
+        self.dataFeatures = list(feature_list)
         # Remove unique and target column
         self.dataFeatures.remove(self.uniqueColumn)
         self.dataFeatures.remove(self.targetColumn)
@@ -58,9 +78,6 @@ class DataPackage:
         self.isCleaned = False
         self.isEncoded = False
         self.isStopWorded = False
-
-        self.isCleanDataLoaded = False
-        self.cleanData = None
 
         self.__clearTrainTestData()
 
@@ -82,82 +99,90 @@ class DataPackage:
         self.data_package_params = data_package_params
         self.hasDataPackageParams = True
 
-        # Check to see if we need to process it
-        if self.data_package_params.process_params:
-            print(f'Params loaded. Process set to True.')
-            print(f'Processing Data Package')
-            self.__processDataPackage()
-
-    def processDataPackage(self):
-        self.data_package_params.process_params = True
-        self.__processDataPackage()
-
     # Process the datapackage. Called from __setDataPackageParams
-    def __processDataPackage(self):
+    def processDataPackage(self, 
+                           num_cores=6,
+                           random_state=786,
+                           verbose=True,
+                           show_records=5):
         # Confirm it hasn't already been processed
         if self.isProcessed:
             print(f'DataPackage has already been processed')
             return
 
-        # Confirm we are to process it
-        if self.data_package_params.process_params:
-            self.display()
-            print(f'Processing data package with provided parameters')
+        self.display()
+        print(f'Processing data package with provided parameters')
 
-            ##################################
-            # Text Cleaning
 
+        # General message for not balancing
+        if not self.data_package_params.balance_dataset:
+            print(f'Not balancing dataset. balance_dataset=False')
+
+
+        if self.data_package_params.balance_dataset and self.data_package_params.balance_type == 'undersample':
             # classbalance undersample
-            self.classBalanceUndersample(sampleSize=self.data_package_params.sample_size)
+            self.classBalanceUndersample(sampleSize=self.data_package_params.undersample_size)
 
-            # process text column
-            self.clean_text_column(data_package_params=self.data_package_params)
+        ##################################
+        # Text Cleaning
+        self.processText(num_cores=num_cores)
 
-            # remove stopwords
-            self.remove_stopwords(stopword_language=self.data_package_params.stopword_language)
+        ##################################
+        # Text encoding
 
-            # Done cleaning, now save "cleaned" dataframe for use later
-            self.__setCleanData(self.getWorkingData())
+        # process_TFIDF
+        self.process_TFIDF(max_features=self.data_package_params.max_features)
 
-            ##################################
-            # Text encoding
 
-            # process_TFIDF
-            self.process_TFIDF(max_features=self.data_package_params.max_features)
+        # splittraintest
+        self.splitTrainTest(stratifyColumn=self.data_package_params.stratifyColumn,
+                            train_size=self.data_package_params.train_size,
+                            random_state=self.data_package_params.random_state,
+                            shuffle=self.data_package_params.shuffle)
 
-            # splittraintest
-            self.splitTrainTest(stratifyColumn=self.data_package_params.stratifyColumn,
-                                train_size=self.data_package_params.train_size,
-                                random_state=self.data_package_params.random_state,
-                                shuffle=self.data_package_params.shuffle)
-            print(f'')
-            print(f'Processing data package has been completed')
-            print(f'')
-            self.isProcessed = True
-            self.display()
+        
+        # Class balance oversample - has to occur after train/test split
+        # oversample only on training data
+        if self.data_package_params.balance_dataset and self.data_package_params.balance_type == 'oversample':
+            
+            self.classBalanceOversample(verbose=verbose,
+                                        show_records=show_records,
+                                        random_state=random_state)
+      
+        print(f'')
+        print(f'Processing data package has been completed')
+        print(f'')
+        self.isProcessed = True
+        self.display()
 
-        else:
-            print(f'__processDataPackage called with process_params=False')
-            return
 
     # Function for cleaning text, lemmatization, etc
     # Basic functionality included now, to be expanded later
     # Goal is to keep this to one function if possible
-    def clean_text_column(self,
-                          data_package_params=None):
-        dps.clean_text_column(dataFrame=self.workingData,
-                              data_column=self.dataColumn,
-                              data_package_params=data_package_params)
+    def processText(self, num_cores=4):
+        
+        # Stores parameters for sending to function to analyze frame
+        func_input = []
 
+        df_split = np.array_split(self.workingData, num_cores)
+        
+        for count, df_part in enumerate(df_split, start=1):
+            func_input.append([df_part, self.dataColumn, self.data_package_params, count])
+
+        print(f'Spawning {num_cores} processes to process text')
+        print(f'Processes completed: [ ', end='')
+        myDF = None
+        pool = Pool(num_cores)
+        myDF = pd.concat(pool.starmap(dps.clean_text_column, func_input))
+        
+        pool.close()
+        pool.join()
+        print(f']')
+
+        self.workingData = myDF.copy()
         self.isCleaned = True
+        self.isStopWorded = self.data_package_params.remove_stopwords
 
-    # Remove stopwords
-    def remove_stopwords(self, stopword_language='english'):
-        dps.remove_stopwords(dataFrame=self.workingData,
-                             data_column=self.dataColumn,
-                             stopword_language=stopword_language
-                             )
-        self.isStopWorded = True
 
     def process_TFIDF(self,
                       max_features=100,
@@ -187,16 +212,6 @@ class DataPackage:
         print(self.dataFeatures)
         print(f'')
 
-    def getCleanData(self):
-        if self.isCleanDataLoaded:
-            return self.cleanData
-        else:
-            print('Clean data has not been saved')
-
-    def __setCleanData(self, cleanData):
-        self.cleanData = cleanData
-        self.isCleanDataLoaded = True
-
     def __setTrainData(self, trainData):
         self.trainData = trainData
         self.isTrainDataLoaded = True
@@ -216,10 +231,6 @@ class DataPackage:
             return self.testData
         else:
             print("Test data has not been loaded")
-
-    def __clearCleanData(self):
-        self.cleanData = None
-        self.isCleanDataLoaded = False
 
     def __clearOrigData(self):
         self.origData = None
@@ -257,7 +268,7 @@ class DataPackage:
         if self.isOrigDataLoaded:
             return self.origData
         else:
-            display("Original data frame is not loaded")
+            print("Original data frame is not loaded")
 
     def getWorkingData(self):
         return self.workingData
@@ -276,18 +287,14 @@ class DataPackage:
         print(f'{emptySpace}Data:')
         print(f'{indent}isOrigDataLoaded: {self.isOrigDataLoaded}')
         print(f'{indent}isWorkingDataLoaded: {self.isWorkingDataLoaded}')
-        print(f'{indent}isCleanDataLoaded: {self.isCleanDataLoaded}')
+        
         print(f'{indent}isTrainDataLoaded: {self.isTrainDataLoaded}')
         print(f'{indent}isTestDataLoaded: {self.isTrainDataLoaded}')
         print(f'')
 
         print(f'{emptySpace}Original Data:')
         print(f'{indent}original data shape: {self.origData.shape}')
-        print(f'{emptySpace}Cleaned Data:')
-        if self.cleanData is None:
-            print(f'{indent}clean data shape: "N/A"')
-        else:
-            print(f'{indent}{indent}clean data shape: {self.cleanData.shape}')
+        
         print(f'{emptySpace}Working Data:')
         print(f'{indent}working data shape: {self.workingData.shape}')
         print(f'')
@@ -296,10 +303,11 @@ class DataPackage:
         print(f'{indent}isProcessed: {self.isProcessed}')
         print(f'{indent}isCleaned: {self.isCleaned}')
         print(f'{indent}isStopWorded: {self.isStopWorded}')
-
         print(f'{indent}isBalanced: {self.isBalanced}')
         print(f'{indent}isEncoded: {self.isEncoded}')
         print(f'{indent}isTrainTestSplit: {self.isTrainTestSplit}')
+        print(f'{indent}isImportantFeaturesApplied: {self.isImportantFeaturesApplied}')
+        
 
 
 
@@ -327,6 +335,34 @@ class DataPackage:
         if not self.isBalanced:
             self.__setWorkingData(dfBalanced)
             self.isBalanced = True
+
+    # Class balance oversample will oversample for training data only
+    # Must have been train/test split prior to this running
+    def classBalanceOversample(self,
+                               verbose=True,
+                               show_records=5,
+                               random_state=765):
+        
+        if not self.isTrainTestSplit:
+            print(f'Data has not been train_test_split.')
+            print(f'Oversampling will only occur on training data')
+            return
+        else:
+            print(f'Data has been train/test split')
+            print(f'Oversampling for class balance will occur on the training datset only')
+        
+        retDF = dps.classBalanceOversample(dataFrame=self.getTrainData(),
+                                          columnName=self.targetColumn,
+                                          random_state=random_state,
+                                          verbose=verbose,
+                                          show_records=show_records)
+        
+        
+        if not self.isBalanced:
+            self.__setTrainData(retDF)
+            self.isBalanced = True
+        
+        
 
     def getXTrainData(self,
                       finalFeatures=None):
@@ -363,15 +399,88 @@ class DataPackage:
             print(f'Saving file as {filename}')
             pickle.dump(self, f)
 
+
+    def set_important_features(self, keep_features):
+        # Needs to be set for working/train/test datasets
+        
+        print(f'Filtering data for only important features')
+        if self.isWorkingDataLoaded:
+            self.workingData = self.workingData[keep_features]
+            
+        if self.isTrainDataLoaded:
+            self.trainData = self.trainData[keep_features]
+            
+        if self.isTestDataLoaded:
+            self.testData = self.testData[keep_features]
+            
+        self.setDataFeatures(feature_list=self.workingData.columns)
+        self.isImportantFeaturesApplied = True
+        
+
     @classmethod
     def load(cls, filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
 
-
+# Holds all relevant processing/cleaning parameters
+@dataclass        
 class DataPackageParams:
-    __version = 0.1
+    __version = 0.2
 
+    
+
+    # Text Cleaning Params
+    fix_unicode: bool = True  # fix various unicode errors
+    to_ascii: bool = True  # transliterate to closest ASCII representation
+    lower: bool = True  # lowercase text
+    no_line_breaks: bool = False  # fully strip line breaks as opposed to only normalizing them
+    no_urls: bool = False  # replace all URLs with a special token
+    no_emails: bool = False  # replace all email addresses with a special token
+    no_phone_numbers: bool = False  # replace all phone numbers with a special token
+    no_numbers: bool = False  # replace all numbers with a special token
+    no_digits: bool = False  # replace all digits with a special token
+    no_currency_symbols: bool = False  # replace all currency symbols with a special token
+    no_punct: bool = False  # remove punctuations
+    replace_with_punct: str = ""  # instead of removing punctuations you may replace them
+    replace_with_url: str = "<URL>"
+    replace_with_email: str = "<EMAIL>"
+    replace_with_phone_number: str = "<PHONE>"
+    replace_with_number: str = "<NUMBER>"
+    replace_with_digit: str = "0"
+    replace_with_currency_symbol: str = "<CUR>"
+    lang: str = "en"  # set to 'de' for German special handling
+
+    # Contractions
+    fix_contractions: bool = False
+
+    # Lemmatize
+    lemmatize: bool = False
+    
+    #Remove small tokens
+    remove_small_tokens: bool = False
+    min_token_size: int = 0
+
+    # Stopwords
+    remove_stopwords: bool = True  # Remove stopwords
+    stopword_language: str = 'english'
+    custom_stopwords: list = None
+
+    # Class Balance
+    balance_dataset: bool = False
+    balance_type: str = 'undersample'
+    undersample_size: int = None  # Can be set to an absolute value. None means undersample to smallest
+    
+    # train test split params
+    stratifyColumn: str = None
+    train_size: float = 0.8
+    random_state: int = 765
+    shuffle: bool = True
+
+    # Encoding params
+    encoding_type: str = 'TFIDF'
+    max_features: int = 100  # Currently only used in TFIDF
+   
+    
     def save(self,
              filename):
         if filename is None:
@@ -385,86 +494,3 @@ class DataPackageParams:
     def load(cls, filename):
         with open(filename, 'rb') as f:
             return pickle.load(f)
-
-    def __init__(self,
-                 # Process package on load?
-                 process_params=True,  # True to process package on load
-
-                 # Class Balance
-                 sample_size=None,  # Can be set to an absolute value. None means undersample to smallest
-
-                 # Text Cleaning Params
-                 fix_unicode=True,  # fix various unicode errors
-                 to_ascii=True,  # transliterate to closest ASCII representation
-                 lower=True,  # lowercase text
-                 no_line_breaks=False,  # fully strip line breaks as opposed to only normalizing them
-                 no_urls=False,  # replace all URLs with a special token
-                 no_emails=False,  # replace all email addresses with a special token
-                 no_phone_numbers=False,  # replace all phone numbers with a special token
-                 no_numbers=False,  # replace all numbers with a special token
-                 no_digits=False,  # replace all digits with a special token
-                 no_currency_symbols=False,  # replace all currency symbols with a special token
-                 no_punct=False,  # remove punctuations
-                 replace_with_punct="",  # instead of removing punctuations you may replace them
-                 replace_with_url="<URL>",
-                 replace_with_email="<EMAIL>",
-                 replace_with_phone_number="<PHONE>",
-                 replace_with_number="<NUMBER>",
-                 replace_with_digit="0",
-                 replace_with_currency_symbol="<CUR>",
-                 lang="en",  # set to 'de' for German special handling
-
-                 # Stopwords
-                 remove_stopwords=True,  # Remove stopwords
-                 stopword_language='english',
-
-                 # train test split params
-                 stratifyColumn=None,
-                 train_size=0.8,
-                 random_state=765,
-                 shuffle=True,
-
-                 # Encoding params
-                 encoding_type='TFIDF',
-                 max_features=100  # Currently only used in TFIDF
-                 ):
-        # Process package
-        self.process_params = process_params
-
-        # Class Balance
-        self.sample_size = sample_size  # Can be set to an absolute value. None means undersample to smallest
-
-        # Stopwords
-        self.remove_stopwords = remove_stopwords
-        self.stopword_language = stopword_language
-
-        # Balance params
-        self.fix_unicode = fix_unicode  # fix various unicode errors
-        self.to_ascii = to_ascii  # transliterate to closest ASCII representation
-        self.lower = lower  # lowercase text
-        self.no_line_breaks = no_line_breaks  # fully strip line breaks as opposed to only normalizing them
-        self.no_urls = no_urls  # replace all URLs with a special token
-        self.no_emails = no_emails  # replace all email addresses with a special token
-        self.no_phone_numbers = no_phone_numbers  # replace all phone numbers with a special token
-        self.no_numbers = no_numbers  # replace all numbers with a special token
-        self.no_digits = no_digits  # replace all digits with a special token
-        self.no_currency_symbols = no_currency_symbols  # replace all currency symbols with a special token
-        self.no_punct = no_punct  # remove punctuations
-        self.replace_with_punct = replace_with_punct  # instead of removing punctuations you may replace them
-        self.replace_with_url = replace_with_url
-        self.replace_with_email = replace_with_email
-        self.replace_with_phone_number = replace_with_phone_number
-        self.replace_with_number = replace_with_number
-        self.replace_with_digit = replace_with_digit
-        self.replace_with_currency_symbol = replace_with_currency_symbol
-        self.lang = lang  # set to 'de' for German special handling
-
-        # Train/Test Split params
-        self.stratifyColumn = stratifyColumn
-        self.train_size = train_size
-        self.random_state = random_state
-        self.shuffle = shuffle
-
-        # Encoding params
-        self.encoding_type = encoding_type
-        self.max_features = max_features

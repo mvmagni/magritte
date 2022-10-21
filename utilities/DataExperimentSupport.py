@@ -11,10 +11,12 @@ from sklearn.linear_model import Lasso
 from sklearn import metrics
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import accuracy_score
+from sklearn.metrics import balanced_accuracy_score
 from sklearn.metrics import precision_score
 from sklearn.metrics import recall_score
 from sklearn.metrics import f1_score
 from sklearn.metrics import cohen_kappa_score
+from sklearn.metrics import roc_auc_score
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import learning_curve
 from sklearn.model_selection import StratifiedKFold
@@ -26,6 +28,9 @@ import lime
 from lime import lime_tabular
 from matplotlib.pyplot import xticks
 from wordcloud import WordCloud
+from IPython.display import HTML
+from keras import backend as K 
+
 
 
 def createModel(data,
@@ -48,17 +53,86 @@ def createModel(data,
     model = copy.deepcopy(untrained_model)
 
     if experiment_method == 'supervised':
-        model.fit(X, Y)
+        _ = model.fit(X, Y)
 
     elif experiment_method == 'unsupervised':
-        model.fit(X)
+        _ = model.fit(X)
     else:
         print("Invalid experiment_method detected")
 
     return model
 
+def createTensorModel(data,
+                      uniqueColumn,
+                      targetColumn,
+                      untrained_model,
+                      tensor_parms):
+    
+    tDf = data.copy()
+
+    # Get Y value from dataframe
+    Y = np.array(tDf[targetColumn])
+
+    # Drop unneeded columns for model training
+    tDf.drop([uniqueColumn, targetColumn], axis=1, inplace=True)
+
+    # Get X Value from rest of dataframe
+    X = tDf.to_numpy()
+
+    # fit model on training data
+    #model = copy.deepcopy(untrained_model)
+    model = untrained_model
+
+    # print(f'tensor_parms.loss={tensor_parms.loss}')
+    # print(f'tensor_parms.optimizer={tensor_parms.optimizer}')
+    # print(f'tensor_parms.metrics={tensor_parms.metrics}')
+
+    #K.clear_session()
+    model.compile(loss=tensor_parms.loss,
+                  optimizer=tensor_parms.optimizer,
+                  metrics=tensor_parms.metrics)
+    
+    history = model.fit(X, Y, 
+                        validation_split=tensor_parms.validation_split,
+                        epochs=tensor_parms.epochs,
+                        batch_size=tensor_parms.batch_size,
+                        shuffle=tensor_parms.shuffle,
+                        verbose=tensor_parms.verbose)
+
+    return model, history
 
 def predictModel(model,
+                 data,
+                 uniqueColumn,
+                 targetColumn,
+                 colActual='y_test',
+                 colPredict='y_pred',
+                 use_argmax=False):
+    tDf = data.copy()
+
+    Y = np.array(tDf[targetColumn])
+
+    # Drop unneeded columns for model testing
+    tDf.drop([uniqueColumn, targetColumn], axis=1, inplace=True)
+
+    # Get X Value from rest of dataframe
+    X = tDf.to_numpy()
+
+    
+    if use_argmax: # Tensor style prediction
+        predictions = model.predict(X)
+        y_pred = predictions.argmax(axis=1)
+    else: 
+        y_pred = model.predict(X)
+
+    # make a dataframe for the results
+    tDf = pd.DataFrame(data=Y, columns=[colActual])
+    tDf[colPredict] = y_pred.tolist()
+
+    return tDf, colActual, colPredict
+
+
+def predictProba(model,
                  data,
                  uniqueColumn,
                  targetColumn,
@@ -74,13 +148,13 @@ def predictModel(model,
     # Get X Value from rest of dataframe
     X = tDf.to_numpy()
 
-    y_pred = model.predict(X)
+    y_prob = model.predict_proba(X)
+    #print(f'predictProba: returning {y_prob}')
+    return y_prob
 
-    # make a dataframe for the results
-    tDf = pd.DataFrame(data=Y, columns=[colActual])
-    tDf[colPredict] = y_pred.tolist()
 
-    return tDf, colActual, colPredict
+
+
 
 
 # Creates a dataframe with two columns:
@@ -313,6 +387,7 @@ def showFeatureImportance(model,
     else:
         viz = FeatureImportances(model, topn=topn)
 
+    plt.close()
     viz.fit(XTrain, YTrain)
     viz.show()
     plt.clf()
@@ -431,10 +506,15 @@ def plot_learning_curve(train_sizes,
     _ = plt.show()
     plt.clf()
 
-
 def getModelAccuracy(data, colActual, colPredict):
     accuracy = accuracy_score(data[colActual],
                               data[colPredict])
+
+    return accuracy
+
+def getModelAccuracyBalanced(data, colActual, colPredict):
+    accuracy = balanced_accuracy_score(data[colActual],
+                                      data[colPredict])
 
     return accuracy
 
@@ -454,6 +534,13 @@ def getModelRecall(data, colActual, colPredict, average='weighted'):
 
     return recall
 
+def getAUC(data, colActual, predictProba, average='macro'):
+    auc = roc_auc_score(data[colActual],
+                        predictProba,
+                        multi_class='ovr',
+                        average=average)
+    print(f'getAUC: returning {auc}')
+    return auc
 
 def getModelF1(data, colActual, colPredict, average='weighted'):
     f1 = f1_score(data[colActual],
@@ -631,6 +718,8 @@ def show_model_summary(data_frame,
     value_name = 'value_name'
     var_name = 'Metric'
 
+    dataframe_rows = len(data_frame)
+
     tDF = pd.melt(data_frame,
                   id_vars=id_var,
                   value_vars=value_vars,
@@ -642,13 +731,15 @@ def show_model_summary(data_frame,
 
     # plt.figure(figsize=(10, 10) )
     # fig, ax = plt.subplots(figsize=(10,10))
+    aspect_ratio = 0.4 + dataframe_rows*0.2
     gfg = sns.catplot(x=id_var,
                       y=value_name,
                       hue=var_name,
                       data=tDF,
                       kind='bar',
-                      height=6,
-                      aspect=1.2)
+                      height=8,
+                      aspect=aspect_ratio,
+                      palette='coolwarm_r')
 
     gfg.set(ylim=(0, 1))
     if individual:
@@ -660,7 +751,10 @@ def show_model_summary(data_frame,
         gfg.set(xlabel='Experiment', ylabel="Metric Value", title=title)
     plt.show()
 
-    print(data_frame.head())
+    records_to_show = len(data_frame)
+    display(HTML(data_frame.to_html(index=False)))
+    #display(data_frame.style.hide_index().head(records_to_show))
+
 
 
 def getWordCloud(text):
@@ -678,6 +772,7 @@ def show_cluster_mapping_cloud(srcDF,
                                textCol,
                                colNameActual,
                                colNamePredict):
+    
     # Find out how many unique values we have to deal with
     a = srcDF[colNameActual].unique().tolist()
     b = srcDF[colNamePredict].unique().tolist()
@@ -692,7 +787,7 @@ def show_cluster_mapping_cloud(srcDF,
         # get Text for actual
         tmpDFActual = srcDF[srcDF[colNameActual] == x].copy()
         textActual = tmpDFActual[textCol].values
-
+        
         # get Text for predicted
         tmpDFPred = srcDF[srcDF[colNamePredict] == x]
         textPred = tmpDFPred[textCol].values

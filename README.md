@@ -56,7 +56,7 @@
 
 The purpose of this project is to create a flexible, reusable, and simplified pipeline for NLP processing. The goal is to incorporate the main processes, flows, and reporting for NLP projects so that your time is spent on solving the problem and not integrating code. 
 
-No single pipeline will meet all needs. So I'll be adding more in the near future. Thanks to all the people have contributed to expanding this template!
+No single pipeline will meet all needs. So I'll be adding more in the near future. Thanks to all the people have contributed to expanding this!
 
 <p align="right">(<a href="#top">back to top</a>)</p>
 </details>

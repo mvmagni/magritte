@@ -2,6 +2,7 @@ from DataExperiment import DataExperiment
 import DataExperimentSupport as des
 import pickle
 from performance_utils import PerformanceStore
+from TensorParameters import TensorParms
 
 
 # Note to self: self, you need to add alot more comments
@@ -12,7 +13,8 @@ class ExperimentManager:
                  experiment_name,
                  untrained_model,
                  experiment_method,
-                 data_package):
+                 data_package,
+                 tensor_parms=None):
 
         self.isDataPackageLoaded = False
         self.data_package = None
@@ -24,7 +26,8 @@ class ExperimentManager:
 
         self.add_experiment(experiment_name=experiment_name,
                             experiment_method=experiment_method,
-                            untrained_model=untrained_model)
+                            untrained_model=untrained_model,
+                            tensor_parms=tensor_parms)
 
     def add_data_package(self,
                          data_package):
@@ -35,17 +38,33 @@ class ExperimentManager:
     def add_experiment(self,
                        experiment_name,
                        experiment_method,
-                       untrained_model):
+                       untrained_model,
+                       tensor_parms=None):
 
         de = DataExperiment(projectName=self.project_name,
                             experimentName=experiment_name,
                             experiment_method=experiment_method,
                             dataPackage=self.data_package,
                             untrained_model=untrained_model)
+        
+        if de.isKerasModel(): # if this is a keras/tensor model
+            # Need to add in tensor_parms, either given or a default
+            if tensor_parms is None:
+                de.add_tensor_parms(tensor_parms=TensorParms())
+
+            else: 
+                de.add_tensor_parms(tensor_parms=tensor_parms)
+            
+        # Add experiment to the managed list of experiments
         self.experiments.append(de)
 
     def list_experiments(self):
-        print(f'idx Processed Method      Experiment name')
+        label_idx = 'idx'.rjust(3)
+        label_process = 'Processed'.rjust(9)
+        label_method = 'Method'.rjust(12)
+        label_exp_name = 'Experiment name'.ljust(30)
+        
+        print(f'{label_idx} {label_process} {label_method} {label_exp_name}')
         for count, exp in enumerate(self.experiments):
             idx = '{0: >3}'.format(count)
             status = '{0: >9}'.format(str(exp.isProcessed))
@@ -64,17 +83,30 @@ class ExperimentManager:
             print(f'Experiment list:')
             self.list_models()
 
-    def run_experiment(self,
-                       index=None):
-        monitor_all = PerformanceStore()
-        openProc = ''.ljust(75, '-')
-        closeProc = ''.ljust(75, '=')
+    # Processes data package
+    def process_data_package(self, num_cores=6):
         if self.data_package.isProcessed is False:
             print(f'Data package has not been processed. Processing now.')
-            print(openProc)
-            self.data_package.processDataPackage()
-            print(closeProc)
-            print('')
+            
+            self.data_package.processDataPackage(num_cores=num_cores)
+
+        else:
+            print(f'Data package has already been processed')
+
+    # Runs all the experiments and processes data package if necessary
+    def run_experiment(self,
+                       index=None,
+                       num_cores=6):
+        monitor_all = PerformanceStore()
+        
+        openProc = ''.ljust(75, '-')
+        closeProc = ''.ljust(75, '=')
+
+        print(openProc)
+        self.process_data_package(num_cores=num_cores)
+        print(closeProc)
+        print('')
+        
         if index is None:
             # process all experiments
             for idx, exp in enumerate(self.experiments):
@@ -92,10 +124,11 @@ class ExperimentManager:
             print(f'Processing experiment: {self.experiments[index].experimentName}')
             self.experiments[index].process()
 
-        print(f'')
-        self.show_model_comparison()
-        print(f'')
-        print(f'Processing experiments complete. {monitor_all.end_timer()}')
+        if len(self.experiments) > 1:
+            print(f'')
+            self.show_model_comparison()
+            print(f'')
+            print(f'Processing experiments complete. {monitor_all.end_timer()}')
 
     def display_experiment_summary(self,
                                    axis_labels,
@@ -148,6 +181,82 @@ class ExperimentManager:
         with open(filename, 'wb') as f:
             print(f'Saving file as {filename}')
             pickle.dump(self, f)
+
+    def analyzeModelFeatureImportance(self,
+                                      experiment_index,
+                                      returnAbove=0.002,
+                                      startValue=0.0001,
+                                      increment=0.0001,
+                                      upperValue=0.03,
+                                      showSummary=True,
+                                      showPlot=True,
+                                      num_cores=4,
+                                      process_package=False,
+                                      apply_features=False):
+        myExp = None
+
+        if not self.data_package.isProcessed:
+            if process_package:
+                self.process_data_package(num_cores=num_cores)
+            else:
+                print(f'Data package has not yet been processed.')
+                print(f'Please run: process_data_package(num_cores=X) or set process_package=True, num_cores=X')
+                return
+
+        #Check that experiment index exists
+        if 0 <= experiment_index < len(self.experiments):
+            # Get a reference to the experiment. Will be used alot
+            myExp = self.experiments[experiment_index]
+            
+            # if the experiment is already processed (e.g. model created)
+            if self.experiments[experiment_index].isProcessed:
+                print(f'Experiment index[{experiment_index}]{myExp.experimentName} model already created')
+                
+            # Model has not been created
+            else:
+                print(f'Experiment index[{experiment_index}]{myExp.experimentName} not yet created. Generating')
+                myExp.process()
+            
+
+            df, featureLabel, valueLabel = des.getModelFeatureImportance(myExp.getModel())
+
+            retDf = des.analyzeModelFeatureImportance(data=df,
+                                                    valueLabel=valueLabel,
+                                                    startValue=startValue,
+                                                    increment=increment,
+                                                    upperValue=upperValue,
+                                                    returnAbove=returnAbove,
+                                                    showSummary=showSummary,
+                                                    showPlot=showPlot)
+            
+            # Get full list of features
+            features = self.data_package.dataFeatures
+            keepFeatures = retDf[featureLabel].to_list()
+            
+                    # Initialize important features list
+            features_important = []
+
+            for x in keepFeatures:
+                features_important.append(features[x])
+
+            print(f'Important features kept:')
+            print(features_important)
+
+            if apply_features:
+                features_important.append(self.data_package.uniqueColumn)
+                features_important.append(self.data_package.targetColumn)
+                self.data_package.set_important_features(keep_features=features_important)
+                
+                print(f'dataPackage features changed. Resetting state of experiment models to unprocessed')
+                for exp in self.experiments:
+                    exp.isProcessed=False
+                
+                self.list_experiments()
+
+        else:
+            print(f'Experiment index [{experiment_index}] does not exist')
+
+
 
     @classmethod
     def load(cls, filename):

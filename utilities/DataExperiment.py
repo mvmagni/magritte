@@ -5,9 +5,12 @@ import copy
 import pickle
 import pandas as pd
 from performance_utils import PerformanceStore
+from keras import backend as K 
 
-
-# Note to self: self, you need to add alot more comments
+# Note to self: self, you need to add alot more comments, this has grown
+# too big, too fast.
+# Note to self: self, you need to change this to a dataclass
+# Note to self: desperately needs a refactor!!!!
 class DataExperiment:
 
     def __init__(self,
@@ -17,6 +20,7 @@ class DataExperiment:
                  untrained_model,
                  dataPackage):
         self.projectName = projectName
+        #print(f'Settings experimentName to: {experimentName}')
         self.experimentName = experimentName
         self.experiment_method = experiment_method # [supervised | unsupervised]
         self.has_been_automapped = False # If unsupervised and Target available predictions can be mapped
@@ -31,20 +35,23 @@ class DataExperiment:
 
         self.isModelPredicted = False
         self.modelPrediction = None
+        self.modelPredictProba = None
         self.unmappedPrediction = None # stores model prediction if unsupervised with target and mapped
         self.modelAccuracy = None
-        self.modelPrecision = None
-        self.modelRecall = None
-        self.modelF1 = None
+        self.modelAccuracyBal = None
+        self.modelPrecisionMicro = None
+        self.modelRecallMicro = None
+        self.modelF1Micro = None
+        self.modelF1Weighted = None
         self.modelCohenKappa = None
-
+        self.modelAUC = None
+        
         self.isLearningCurveCreated = False
         self.model_train_sizes = None
         self.model_train_scores = None
         self.model_test_scores = None
         self.model_fit_times = None
-        self.modelROCAUC = None
-
+        
         self.isROCAUCCalculated = False
         self.modelROCAUC = None
 
@@ -53,11 +60,16 @@ class DataExperiment:
         self.hasSHAPValues = False
         self.shap_values = None
 
+        # parameters for tensor model training
+        self.tensor_parms = None
+        self.model_history = None # Model history for after training completed
+        
         # ===============================================
         self.check_input()
         self.display()
 
     def check_input(self):
+        # Check that methods are valid
         valid_methods = ['supervised', 'unsupervised']
         isOk = False
         e_message = ''
@@ -74,6 +86,17 @@ class DataExperiment:
         except AssertionError as e:
             e.args += (e_message, f'Use: {", ".join(valid_methods)}')
             raise
+
+    def isKerasModel(self):
+        strDes = str(type(self.untrained_model))
+        print(strDes)
+        if strDes.find('keras.engine') == -1:
+            return False
+        else:
+            return True
+
+    def add_tensor_parms(self, tensor_parms):
+        self.tensor_parms = tensor_parms
 
     def display(self):
         indent = '---> '
@@ -112,16 +135,31 @@ class DataExperiment:
     def createModel(self):
         monitor = PerformanceStore()
         print(f'Training model for {self.experimentName}. ', end='')
-        model = des.createModel(data=self.dataPackage.getTrainData(),
-                                uniqueColumn=self.dataPackage.uniqueColumn,
-                                targetColumn=self.dataPackage.targetColumn,
-                                untrained_model=self.getUntrainedModel(),
-                                experiment_method=self.experiment_method)
+        if self.isKerasModel():
+            print(f'Keras model detected. compiling and training')
+            model, history = des.createTensorModel(data=self.dataPackage.getTrainData(),
+                                                   uniqueColumn=self.dataPackage.uniqueColumn,
+                                                   targetColumn=self.dataPackage.targetColumn,
+                                                   untrained_model=self.getUntrainedModel(),
+                                                   tensor_parms=self.tensor_parms)
+        
+            # Save the training history
+            self.model_history = history
+            
+        else: 
+        
+            model = des.createModel(data=self.dataPackage.getTrainData(),
+                                    uniqueColumn=self.dataPackage.uniqueColumn,
+                                    targetColumn=self.dataPackage.targetColumn,
+                                    untrained_model=self.getUntrainedModel(),
+                                    experiment_method=self.experiment_method)
 
         self.__setModel(model)
 
         print(f'Completed. {monitor.end_timer()}')
         self.predictModel()
+        K.clear_session()
+
 
     def __setModel(self, model):
         self.model = model
@@ -138,44 +176,61 @@ class DataExperiment:
                              predictionData,
                              colActual,
                              colPredict,
-                             average='weighted',
+                             predict_proba=None,
                              sigDigs=2):
         self.modelPrediction = predictionData
         self.isModelPredicted = True
         self.modelPredictionColActual = colActual
         self.modelPredictionColPredict = colPredict
+        if predict_proba is None:
+            self.modelPredictProba = 0
+        else: 
+            self.modelPredictProba = predict_proba
+
 
         self.modelAccuracy = round(des.getModelAccuracy(data=predictionData,
                                                         colActual=colActual,
                                                         colPredict=colPredict), sigDigs)
-
-        self.modelPrecision = round(des.getModelPrecision(data=predictionData,
+        
+        self.modelAccuracyBal = round(des.getModelAccuracyBalanced(data=predictionData,
+                                                                   colActual=colActual,
+                                                                   colPredict=colPredict), sigDigs)
+        
+        self.modelPrecisionMicro = round(des.getModelPrecision(data=predictionData,
                                                           colActual=colActual,
                                                           colPredict=colPredict,
-                                                          average=average), sigDigs)
+                                                          average='micro'), sigDigs)
 
-        self.modelRecall = round(des.getModelRecall(data=predictionData,
+        self.modelRecallMicro = round(des.getModelRecall(data=predictionData,
                                                     colActual=colActual,
                                                     colPredict=colPredict,
-                                                    average=average), sigDigs)
+                                                    average='micro'), sigDigs)
 
-        self.modelF1 = round(des.getModelF1(data=predictionData,
+        self.modelF1Micro = round(des.getModelF1(data=predictionData,
                                             colActual=colActual,
                                             colPredict=colPredict,
-                                            average=average), sigDigs)
+                                            average='micro'), sigDigs)
+
+        self.modelF1Weighted = round(des.getModelF1(data=predictionData,
+                                            colActual=colActual,
+                                            colPredict=colPredict,
+                                            average='weighted'), sigDigs)
 
         self.modelCohenKappa = round(des.getModelCohenKappa(data=predictionData,
                                                             colActual=colActual,
                                                             colPredict=colPredict), sigDigs)
+        
+        if predict_proba is None:
+            self.modelAUC = 0
+        else:
+            self.modelAUC = round(des.getAUC(data=predictionData,
+                                             colActual=colActual,
+                                             colPredict=colPredict,
+                                             average='macro'), sigDigs)
 
     def showModelStats(self):
         print(f'')
         print(f'Model Stats:')
-        # print(f'Accuracy: {self.modelAccuracy}')
-        # print(f'Precision: {self.modelPrecision}')
-        # print(f'Recalll: {self.modelRecall}')
-        # print(f'F1 Score: {self.modelF1}')
-        # print(f'Cohen kappa:: {self.modelCohenKappa}')
 
         id_var, value_vars, df = self.getModelStats_Frame(exp_label=self.experimentName)
 
@@ -191,7 +246,17 @@ class DataExperiment:
         # list of strings
         id_var = 'Experiment'
         id_vars = [id_var]
-        value_vars = ['Accuracy', 'Precision', 'Recall', 'F1 Score', 'Cohen kappa']
+        value_vars = ['Acc.',
+                      'Acc. (bal)',
+                      'Prec (micro)',
+                      'Recall (micro)',
+                      'F1 (micro)',
+                      'F1 (weight)',
+                      'Cohen Kappa']
+        
+        # Removed AUC as it was not calculating for all
+        # Add back later
+        #              'AUC (macro)']
 
         col_names = []
         col_names.extend(id_vars)
@@ -200,10 +265,16 @@ class DataExperiment:
         # list of int
         vals = [exp_label,
                 self.modelAccuracy,
-                self.modelPrecision,
-                self.modelRecall,
-                self.modelF1,
+                self.modelAccuracyBal,
+                self.modelPrecisionMicro,
+                self.modelRecallMicro,
+                self.modelF1Micro,
+                self.modelF1Weighted,
                 self.modelCohenKappa]
+        
+        # Removed AUC as it was not calculating for all
+        # Add back later
+        #    self.modelAUC]
 
         # both lists, with columns specified
         df = pd.DataFrame([vals], columns=col_names)
@@ -216,23 +287,37 @@ class DataExperiment:
             print(f'No model predictions calculated.')
             return None
 
-    def predictModel(self, average='weighted'):
+    def predictModel(self):
         monitor = PerformanceStore()
         print(f'Predicting model for {self.experimentName}. ', end='')
         if self.isModelPredicted:
-            display("Model already predicted. Displaying results:")
+            print("Model already predicted. Displaying results:")
             self.showModelStats()
             return
 
         tDf, colActual, colPredict = des.predictModel(model=self.getModel(),
                                                       data=self.dataPackage.getTestData(),
                                                       uniqueColumn=self.dataPackage.uniqueColumn,
-                                                      targetColumn=self.dataPackage.targetColumn)
+                                                      targetColumn=self.dataPackage.targetColumn,
+                                                      use_argmax=self.isKerasModel()) # if kerasModel=True use argmax
+
+
+        if self.experiment_method == 'supervised' and not self.isKerasModel():
+            print(f'Supervised model being processed. Calling predictProba')
+            predict_proba = des.predictProba(model=self.getModel(),
+                                            data=self.dataPackage.getTestData(),
+                                            uniqueColumn=self.dataPackage.uniqueColumn,
+                                            targetColumn=self.dataPackage.targetColumn
+                                            )
+
+            self.modelPredictProba = predict_proba
+        else: 
+            print(f'Unsupervised model being processed. no predict proba')
 
         self.__setModelPrediction(predictionData=tDf,
                                   colActual=colActual,
-                                  colPredict=colPredict,
-                                  average=average)
+                                  colPredict=colPredict
+                                  )
 
         print(f'Completed. {monitor.end_timer()}')
         self.showModelStats()
@@ -272,10 +357,10 @@ class DataExperiment:
                                           upperValue=upperValue,
                                           showSummary=False)
 
-        des.showAllModelFeatureImportance(data=df,
-                                          featureLabel=featureLabel,
-                                          valueLabel=valueLabel
-                                          )
+        # des.showAllModelFeatureImportance(data=df,
+        #                                   featureLabel=featureLabel,
+        #                                   valueLabel=valueLabel
+        #                                   )
 
         des.showFeatureImportance(model=self.getModel(),
                                   XTrain=self.dataPackage.getXTrainData(),
@@ -288,13 +373,13 @@ class DataExperiment:
         self.isProcessed = True
 
     def showFullModelReport(self,
-                        axis_labels,
-                        startValue=0.0001,
-                        increment=0.0001,
-                        upperValue=0.01,
-                        useLasso=False,
-                        topn=5):
+                           startValue=0.0001,
+                           increment=0.0001,
+                           upperValue=0.01,
+                           useLasso=False,
+                           topn=5):
 
+        axis_labels = list(self.dataPackage.labelEncoder.classes_) 
         self.showModelStats()
 
         des.showReport(data=self.getModelPrediction(),
@@ -328,7 +413,7 @@ class DataExperiment:
             tViz = self.__getModelROCAUC()
             tViz.show()
         else:
-            print('Model ROCAUC not calculated. Starting now')
+            print('Model ROCAUC not calculated. Calculating now')
             viz = des.showROCAUC(dataTrain=self.dataPackage.getTrainData(),
                                  dataTest=self.dataPackage.getTestData(),
                                  classifier=self.getUntrainedModel(),
@@ -347,7 +432,7 @@ class DataExperiment:
         return pickle.loads(self.modelROCAUC)
 
     def showPrecisionRecallCurve(self):
-        des.showPrecisionRecallCurve(model=self.getModel(),
+        des.showPrecisionRecallCurve(model=self.getUntrainedModel(),
                                      XTrain=self.dataPackage.getXTrainData(),
                                      YTrain=self.dataPackage.getYTrainData(),
                                      XTest=self.dataPackage.getXTestData(),
@@ -399,7 +484,7 @@ class DataExperiment:
                                ylim=(0.0, 1.01)
                                ):
         if not self.isLearningCurveCreated:
-            display('Model Learning curve has not yet been calculated. Calculating now')
+            print('Model Learning curve has not yet been calculated. Calculating now')
             self.createModelLearningCurve()
 
         des.plot_learning_curve(train_sizes=self.model_train_sizes,
@@ -410,7 +495,6 @@ class DataExperiment:
                                 axes=axes,
                                 ylim=ylim
                                 )
-
 
     def showLimeGlobalImportance(self):
         des.showLimeGlobalImportance(XTrain=self.dataPackage.getXTrainData(),
@@ -470,37 +554,36 @@ class DataExperiment:
     def __get_mapping_data(self):
 
         # Get clean data
-        cleanDF = self.dataPackage.getCleanData()
+        #cleanDF = self.dataPackage.getCleanData()
+        cleanDF = self.dataPackage.getOrigData()
 
-        # Get test data
+        # Get the uuid applicable for the test data
         testDF = self.dataPackage.getTestData()
         testDF = testDF[[self.dataPackage.uniqueColumn]].copy()
 
         # Get prediction info
         predDF = self.getModelPrediction()
 
+
+        testDF.reset_index(drop=True, inplace=True)
+        predDF.reset_index(drop=True, inplace=True)
+
         # Assemble frame for reporting
         # concat the predictions with the test data (subset of full data)
-        result = pd.concat([testDF.reset_index(drop=True), predDF.reset_index(drop=True)], axis=1)
+        result = pd.concat([testDF, predDF], axis=1)
         result = pd.merge(result, cleanDF, on=self.dataPackage.uniqueColumn, how='inner')
-
-        # Validate merge results
-        summary = result.loc[~(result[self.modelPredictionColActual] == result[self.dataPackage.targetColumn])]
-        try:
-            assert (len(summary) == 0)
-        except AssertionError as e:
-            e.args += ('Merge errors with cluster comparison. Inconsistent merge results between original ' +
-                       'target column and prediction column')
-            raise
 
         return result
 
 
     def show_cluster_mapping_cloud(self):
+        
         # Requirements:
         # Unsupervised with target column present
         if self.is_unsupervised_with_target():
-
+            
+            srcDF = self.__get_mapping_data()
+            
 
             # pass frame to function for processing
             des.show_cluster_mapping_cloud(srcDF=self.__get_mapping_data(),
